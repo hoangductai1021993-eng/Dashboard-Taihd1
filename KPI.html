@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard KPI Kỹ Thuật - TAIHD (Dark Mode)</title>
+    <!-- Thư viện Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Thư viện Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Thư viện PapaParse -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <!-- Thư viện html2canvas để chụp ảnh màn hình -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- Thư viện Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <style>
+        .custom-scrollbar::-webkit-scrollbar {
+            height: 6px;
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 3px;
+        }
+        
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans p-3 md:p-6 min-h-screen">
+    <div class="max-w-[1550px] mx-auto">
+        
+        <!-- Header -->
+        <div class="flex flex-col md:flex-row justify-between items-center mb-6 bg-slate-900 p-4 md:px-6 rounded-2xl shadow-lg border border-slate-800">
+            <div class="flex items-center gap-3.5 mb-3 md:mb-0">
+                <div class="p-3 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-2xl text-white shadow-lg shadow-blue-600/30">
+                    <i class="ph ph-chart-line-up text-2xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-extrabold text-white tracking-tight">Quản Trị Hiệu Suất KPI</h1>
+                    <p class="text-xs text-slate-400 font-semibold uppercase tracking-wider mt-0.5">Chi nhánh Huế - Điều hành TAIHD</p>
+                </div>
+            </div>
+            <div class="w-full md:w-auto bg-slate-950/80 p-2.5 rounded-xl border border-slate-800 hover:border-blue-500 transition-all">
+                <label class="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Cập nhật dữ liệu (.csv)</label>
+                <input type="file" id="csvFileInput" accept=".csv" class="block w-full text-xs text-slate-300 file:mr-3 file:py-1.5 file:px-3.5 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-500 cursor-pointer file:transition-colors">
+            </div>
+        </div>
+
+        <!-- Cảnh báo chưa có dữ liệu -->
+        <div id="noDataAlert" class="bg-slate-900 border border-slate-800 text-slate-300 p-12 rounded-2xl text-center shadow-lg">
+            <div class="w-16 h-16 bg-blue-950 text-blue-400 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl shadow-inner border border-blue-950">
+                <i class="ph ph-upload-simple"></i>
+            </div>
+            <h3 class="text-lg font-bold mb-1 text-white">Chưa có dữ liệu hiển thị</h3>
+            <p class="text-xs text-slate-400">Vui lòng tải file <code class="bg-slate-800 px-2.5 py-1 rounded-md text-blue-400 font-semibold">KPI.csv</code> ở phía trên để hệ thống bắt đầu khởi chạy Dashboard.</p>
+        </div>
+
+        <!-- Main Content -->
+        <div id="mainContent" class="hidden">
+            
+            <!-- Tab Navigation -->
+            <div class="flex border-b border-slate-800 mb-6 bg-slate-900 rounded-t-2xl px-3 pt-3 shadow-sm border-x border-t">
+                <button class="tab-btn active px-6 py-3 font-bold text-xs transition-all text-blue-400 border-b-2 border-blue-500 flex items-center gap-2" data-tab="dashboard">
+                    <i class="ph ph-squares-four text-lg"></i> Tổng Quan Dashboard
+                </button>
+                <button class="tab-btn px-6 py-3 font-bold text-xs transition-all text-slate-400 hover:text-slate-200 border-b-2 border-transparent hover:border-slate-700 flex items-center gap-2" data-tab="details">
+                    <i class="ph ph-table text-lg"></i> Bảng Xếp Hạng Chi Tiết
+                </button>
+            </div>
+
+            <!-- TAB 1: DASHBOARD TỔNG QUAN -->
+            <div id="dashboard" class="tab-content active">
+                
+                <div id="exportInsightsContainer" class="bg-slate-900 p-6 rounded-2xl shadow-lg mb-6 border border-slate-800 relative overflow-hidden space-y-6">
+                    <div class="absolute top-0 left-0 w-2 h-full bg-gradient-to-b from-blue-500 via-amber-500 to-orange-500"></div>
+                    
+                    <div class="flex justify-between items-center pb-3 border-b border-slate-800">
+                        <div class="flex items-center gap-2.5">
+                            <div class="p-2 bg-amber-500/10 text-amber-400 rounded-xl border border-amber-500/20">
+                                <i class="ph ph-lightbulb text-xl"></i>
+                            </div>
+                            <h2 class="text-base font-extrabold text-white tracking-tight">Tổng Quan 11 Chỉ Tiêu KPI</h2>
+                        </div>
+                        <button id="exportInsightsBtn" class="flex items-center gap-1.5 py-1.5 px-3.5 bg-emerald-600 hover:bg-emerald-500 transition-colors text-white rounded-xl shadow-sm font-bold text-xs">
+                            <i class="ph ph-camera text-sm"></i> Xuất ảnh đánh giá
+                        </button>
+                    </div>
+
+                    <!-- 1. Bảng Tổng Hợp 11 Chỉ Tiêu KPI Toàn Khu Vực (Đã format nổi bật Phát huy / Cần cải thiện) -->
+                    <div class="overflow-x-auto custom-scrollbar rounded-xl border border-slate-800">
+                        <table class="w-full border-collapse text-xs text-slate-300">
+                            <thead>
+                                <tr class="bg-slate-950 text-slate-400 uppercase font-extrabold text-[10px] tracking-wider border-b border-slate-800">
+                                    <th class="px-2.5 py-3 text-center border-r border-slate-800">NSLD (>7)</th>
+                                    <th class="px-2.5 py-3 text-center border-r border-slate-800">Checkin Sớm</th>
+                                    <th class="px-2.5 py-3 text-center border-r border-slate-800">Ký Kéo</th>
+                                    <th class="px-2.5 py-3 text-center border-r border-slate-800">Đóng Sớm</th>
+                                    <th class="px-2.5 py-3 text-center border-r border-slate-800">RPT BT</th>
+                                    <th class="px-2.5 py-3 text-center border-r border-slate-800">RPT TK</th>
+                                    <th class="px-2.5 py-3 text-center border-r border-slate-800">Tồn Quá 24h</th>
+                                    <th class="px-2.5 py-3 text-center border-r border-slate-800">Đúng Hẹn</th>
+                                    <th class="px-2.5 py-3 text-center border-r border-slate-800">Lỗi Lặp 2</th>
+                                    <th class="px-2.5 py-3 text-center border-r border-slate-800">Lỗi Lặp 3</th>
+                                    <th class="px-2.5 py-3 text-center">CSAT L2</th>
+                                </tr>
+                            </thead>
+                            <tbody id="summaryCards" class="bg-slate-900">
+                                <!-- Render by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- 2. Đánh Giá Nhanh Hiệu Suất (3 Cột) -->
+                    <div id="autoInsights" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <!-- Render by JS -->
+                    </div>
+
+                    <!-- 3. Phần Nhận Xét Tổng Hợp Tất Cả KPI -->
+                    <div class="bg-slate-950 text-slate-200 p-5 rounded-xl shadow-inner border border-slate-800">
+                        <div class="flex items-center gap-2 text-amber-400 font-extrabold text-xs uppercase tracking-wider mb-2.5 pb-2 border-b border-slate-800">
+                            <i class="ph ph-chats-circle text-base"></i> Nhận Xét Tổng Hợp & Định Hướng Điều Hành (TAIHD)
+                        </div>
+                        <div id="executiveSummary" class="text-xs leading-relaxed space-y-2 text-slate-300">
+                            <!-- Render by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Biểu đồ -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-6">
+                    <div class="bg-slate-900 p-6 rounded-2xl shadow-lg border border-slate-800">
+                        <h2 class="text-sm font-extrabold mb-4 text-white flex items-center gap-2">
+                            <i class="ph ph-chart-bar text-blue-400 text-lg"></i> Top Năng Suất Lao Động (NSLD >7)
+                        </h2>
+                        <canvas id="nsldChart" height="150"></canvas>
+                    </div>
+                    <div class="bg-slate-900 p-6 rounded-2xl shadow-lg border border-slate-800">
+                        <h2 class="text-sm font-extrabold mb-4 text-white flex items-center gap-2">
+                            <i class="ph ph-chart-line text-emerald-400 text-lg"></i> Chất lượng: RPT BT vs RPT TK
+                        </h2>
+                        <canvas id="rptChart" height="150"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: BẢNG XẾP HẠNG CHI TIẾT -->
+            <div id="details" class="tab-content">
+                <div id="exportTableContainer" class="bg-slate-900 rounded-2xl shadow-lg border border-slate-800 overflow-hidden">
+                    
+                    <!-- Toolbar Lọc & Sắp xếp -->
+                    <div class="no-export p-4 md:p-5 border-b border-slate-800 bg-slate-950/70 flex flex-col sm:flex-row justify-between items-center gap-3">
+                        <h2 class="text-sm font-extrabold text-white flex items-center gap-2">
+                            <i class="ph ph-list-numbers text-xl text-blue-400"></i>
+                            Dữ Liệu Chi Tiết Nhân Sự
+                        </h2>
+                        <div class="flex flex-wrap items-center gap-2.5 text-xs">
+                            <div class="relative">
+                                <i class="ph ph-magnifying-glass absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 text-sm"></i>
+                                <input type="text" id="searchInput" placeholder="Tìm kiếm tên nhân viên..." class="pl-9 pr-3.5 py-2 border border-slate-700 rounded-xl focus:outline-none focus:border-blue-500 bg-slate-900 text-white shadow-sm text-xs font-medium placeholder-slate-500">
+                            </div>
+                            
+                            <select id="filterSelect" class="py-2 px-3 border border-slate-700 rounded-xl focus:outline-none focus:border-blue-500 text-slate-200 bg-slate-900 cursor-pointer shadow-sm text-xs font-medium">
+                                <option value="all">Tất cả nhân sự</option>
+                                <option value="kpi_desc">Sắp xếp KPI: Cao -> Thấp</option>
+                                <option value="kpi_asc">Sắp xếp KPI: Thấp -> Cao</option>
+                            </select>
+                            
+                            <button id="sortBtn" class="flex items-center gap-1.5 py-2 px-3.5 border border-slate-700 rounded-xl hover:bg-slate-800 transition-colors text-slate-200 bg-slate-900 shadow-sm font-bold text-xs">
+                                <i class="ph ph-sort-ascending text-sm"></i> Sắp xếp A-Z
+                            </button>
+
+                            <button id="exportImgBtn" class="flex items-center gap-1.5 py-2 px-3.5 bg-emerald-600 hover:bg-emerald-500 transition-colors text-white rounded-xl shadow-sm font-bold text-xs">
+                                <i class="ph ph-camera text-sm"></i> Xuất ảnh bảng
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Khu vực hiển thị Thẻ Đánh Giá Cá Nhân khi tìm kiếm nhân viên -->
+                    <div id="staffProfileContainer" class="hidden p-4 md:p-5 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border-b border-slate-800">
+                        <!-- Render by JS -->
+                    </div>
+
+                    <!-- Bảng dữ liệu -->
+                    <div class="overflow-x-auto custom-scrollbar">
+                        <table class="w-full border-collapse text-xs text-slate-300">
+                            <thead>
+                                <tr class="bg-slate-950 text-slate-300 uppercase font-extrabold text-[11px] tracking-wider border-b border-slate-800">
+                                    <th class="px-3 py-3 text-left sticky-col bg-slate-950 z-10 border-r border-b border-slate-800">Nhân Viên</th>
+                                    <th class="px-2 py-3 text-center border-r border-b border-slate-800">KPI Đạt</th>
+                                    <th class="px-2 py-3 text-left border-r border-b border-slate-800">NSLD (>7)</th>
+                                    <th class="px-2 py-3 text-left border-r border-b border-slate-800">Checkin</th>
+                                    <th class="px-2 py-3 text-left border-r border-b border-slate-800">Ký Kéo</th>
+                                    <th class="px-2 py-3 text-left border-r border-b border-slate-800">Đóng Sớm</th>
+                                    <th class="px-2 py-3 text-left border-r border-b border-slate-800">RPT BT</th>
+                                    <th class="px-2 py-3 text-left border-r border-b border-slate-800">RPT TK</th>
+                                    <th class="px-2 py-3 text-left border-r border-b border-slate-800">Quá 24h</th>
+                                    <th class="px-2 py-3 text-left border-r border-b border-slate-800">Đúng Hẹn</th>
+                                    <th class="px-2 py-3 text-left border-r border-b border-slate-800">Lặp 2</th>
+                                    <th class="px-2 py-3 text-left border-r border-b border-slate-800">Lặp 3</th>
+                                    <th class="px-2 py-3 text-left border-r border-b border-slate-800">CSAT L2</th>
+                                    <th class="px-2 py-3 text-left border-b border-slate-800">CSAT 1,2</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableBody" class="divide-y divide-slate-800">
+                                <!-- Render by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // --- QUẢN LÝ TAB ---
+        const tabBtns = document.querySelectorAll('.tab-btn');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                tabBtns.forEach(b => {
+                    b.classList.remove('active', 'text-blue-400', 'border-blue-500');
+                    b.classList.add('text-slate-400', 'border-transparent');
+                });
+                tabContents.forEach(c => c.classList.remove('active'));
+
+                btn.classList.add('active', 'text-blue-400', 'border-blue-500');
+                btn.classList.remove('text-slate-400', 'border-transparent');
+                const targetId = btn.getAttribute('data-tab');
+                document.getElementById(targetId).classList.add('active');
+            });
+        });
+
+        // --- XỬ LÝ DỮ LIỆU ---
+        let globalData = [];
+        let filteredData = [];
+        let nsldChartInstance = null;
+        let rptChartInstance = null;
+        let sortAlphabet = false;
+
+        const today = new Date();
+        const dayOfMonth = today.getDate();
+        const targetDongSomCurrent = (23 / 30) * dayOfMonth;
+
+        document.getElementById('csvFileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    const text = evt.target.result;
+                    const lines = text.split(/\r\n|\n/);
+                    
+                    let headerIndex = 0;
+                    for (let i = 0; i < lines.length; i++) {
+                        if (lines[i].includes('Nhân Viên')) {
+                            headerIndex = i;
+                            break;
+                        }
+                    }
+
+                    const cleanCsvText = lines.slice(headerIndex).join('\n');
+
+                    Papa.parse(cleanCsvText, {
+                        header: true,
+                        skipEmptyLines: true,
+                        transformHeader: function(header) {
+                            return header.trim();
+                        },
+                        complete: function(results) {
+                            document.getElementById('noDataAlert').classList.add('hidden');
+                            document.getElementById('mainContent').classList.remove('hidden');
+                            processData(results.data);
+                        }
+                    });
+                };
+                reader.readAsText(file, 'UTF-8');
+            }
+        });
+
+        function parsePercent(val) {
+            if (!val) return 0;
+            return parseFloat(val.toString().replace('%', '')) || 0;
+        }
+
+        function calculatePassedKPIs(row) {
+            let passedCount = 0;
+            if (row.NSLD >= 7) passedCount++;
+            if (row.CheckinSom >= 50) passedCount++;
+            if (row.DongSom >= targetDongSomCurrent) passedCount++;
+            if (row.RptBt <= 8) passedCount++;
+            if (row.RptTk <= 24) passedCount++;
+            if (row.Qua24h < 5) passedCount++;
+            if (row.DungHen >= 95) passedCount++;
+            if (row.Lap2 < 8) passedCount++;
+            if (row.Lap3 === 0) passedCount++;
+            if (row.CsatL2 >= 60) passedCount++;
+            if (row.CSAT12 < 3) passedCount++;
+            return passedCount;
+        }
+
+        function processData(data) {
+            const validData = data.filter(row => row['Nhân Viên'] && row['Nhân Viên'].trim() !== '');
+            
+            validData.forEach(row => {
+                row.NSLD = parseFloat(row['NSLD (>7)']) || 0;
+                row.RptBt = parseFloat(row['RPT BT']) || 0;
+                row.RptTk = parseFloat(row['RPT TK']) || 0;
+                row.CheckinSom = parsePercent(row['Checkin Sớm >50%']);
+                row.KyKeo = parsePercent(row['% Ký Kéo 40%']);
+                row.DongSom = parseFloat(row['Đóng Sớm >23 case']) || 0;
+                row.Qua24h = parsePercent(row['% QUÁ 24h <5%']);
+                row.DungHen = parsePercent(row['% Đúng Hẹn']);
+                row.Lap2 = parsePercent(row['% LẶP 2 (<8%)']);
+                row.Lap3 = parsePercent(row['% LẶP 3']);
+                row.CsatL2 = parsePercent(row['% CSAT L2']);
+                row.CSAT12 = parsePercent(row['% CSAT 1,2 <3%']);
+                
+                row.PassedKPIs = calculatePassedKPIs(row);
+                row.NameStr = row['Nhân Viên'];
+            });
+
+            validData.sort((a, b) => b.PassedKPIs - a.PassedKPIs || b.NSLD - a.NSLD);
+            
+            globalData = [...validData];
+            filteredData = [...validData];
+
+            renderInsights(globalData);
+            renderSummary(globalData);
+            renderCharts(globalData);
+            updateTable();
+        }
+
+        function renderInsights(data) {
+            const totalStaff = data.length;
+            const avgNSLD = totalStaff > 0 ? (data.reduce((sum, row) => sum + row.NSLD, 0) / totalStaff).toFixed(2) : 0;
+            
+            const topNSLD = data.slice(0, 3).map(s => `<span class="inline-block bg-emerald-950 text-emerald-300 font-bold px-2 py-0.5 rounded border border-emerald-800 m-0.5 shadow-2xs">${s.NameStr} (<span class="text-emerald-200">${s.NSLD}</span>)</span>`).join('');
+            const underNSLD = data.filter(s => s.NSLD < 7);
+            const underNSLDNames = underNSLD.map(s => `<span class="inline-block bg-red-950 text-red-200 font-medium px-2 py-0.5 rounded border border-red-900 m-0.5 shadow-2xs">${s.NameStr} (<span class="text-red-400 font-bold">${s.NSLD}</span>)</span>`).join('');
+
+            const avgCheckin = totalStaff > 0 ? (data.reduce((sum, row) => sum + row.CheckinSom, 0) / totalStaff).toFixed(1) : 0;
+            const avgDungHen = totalStaff > 0 ? (data.reduce((sum, row) => sum + row.DungHen, 0) / totalStaff).toFixed(1) : 0;
+            
+            const underCheckin = data.filter(s => s.CheckinSom < 50);
+            const underCheckinNames = underCheckin.map(s => `<span class="inline-block bg-rose-950 text-rose-200 font-medium px-2 py-0.5 rounded border border-rose-900 m-0.5 shadow-2xs">${s.NameStr} (<span class="text-rose-400 font-bold">${s.CheckinSom}%</span>)</span>`).join('');
+
+            const underDungHen = data.filter(s => s.DungHen < 95);
+            const underDungHenNames = underDungHen.map(s => `<span class="inline-block bg-amber-950 text-amber-200 font-medium px-2 py-0.5 rounded border border-amber-900 m-0.5 shadow-2xs">${s.NameStr} (<span class="text-amber-400 font-bold">${s.DungHen}%</span>)</span>`).join('');
+
+            const overLap2 = data.filter(s => s.Lap2 >= 8);
+            const overLap2Names = overLap2.map(s => `<span class="inline-block bg-orange-950 text-orange-200 font-medium px-2 py-0.5 rounded border border-orange-900 m-0.5 shadow-2xs">${s.NameStr} (<span class="text-orange-400 font-bold">${s.Lap2}%</span>)</span>`).join('');
+
+            const underCSAT = data.filter(s => s.CsatL2 < 60);
+            const underCSATNames = underCSAT.map(s => `<span class="inline-block bg-red-950 text-red-200 font-medium px-2 py-0.5 rounded border border-red-900 m-0.5 shadow-2xs">${s.NameStr} (<span class="text-red-400 font-bold">${s.CsatL2}%</span>)</span>`).join('');
+
+            document.getElementById('autoInsights').innerHTML = `
+                <div class="p-4 rounded-xl border border-slate-800 bg-slate-950/60 flex flex-col justify-between shadow-sm">
+                    <div>
+                        <div class="flex items-center gap-2 text-blue-400 font-black text-xs uppercase tracking-wider mb-3 pb-2 border-b border-slate-800">
+                            <i class="ph ph-trend-up text-base text-blue-400"></i> 1. Năng Suất (NSLD > 7)
+                        </div>
+                        <div class="text-xs text-slate-300 space-y-2.5">
+                            <div class="bg-slate-900 p-2 rounded-lg border border-slate-800 shadow-2xs">
+                                <span class="font-bold text-slate-400">TB khu vực:</span> <strong class="text-blue-400">${avgNSLD}</strong> ${avgNSLD >= 7 ? '<span class="text-emerald-400 font-bold">(Đạt)</span>' : '<span class="text-red-400 font-bold">(Chưa đạt)</span>'}
+                            </div>
+                            <div>
+                                <div class="font-extrabold text-emerald-400 mb-1 flex items-center gap-1"><i class="ph ph-medal"></i> Top xuất sắc:</div>
+                                <div class="leading-relaxed">${topNSLD || '<span class="text-slate-500 italic">Không có</span>'}</div>
+                            </div>
+                            <div class="pt-2 border-t border-slate-800">
+                                <div class="font-extrabold text-red-400 mb-1 flex items-center gap-1"><i class="ph ph-warning"></i> Dưới chuẩn (${underNSLD.length}):</div>
+                                <div class="leading-relaxed">${underNSLDNames || '<span class="text-emerald-400 font-semibold">100% đạt chuẩn.</span>'}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-4 rounded-xl border border-slate-800 bg-slate-950/60 flex flex-col justify-between shadow-sm">
+                    <div>
+                        <div class="flex items-center gap-2 text-emerald-400 font-black text-xs uppercase tracking-wider mb-3 pb-2 border-b border-slate-800">
+                            <i class="ph ph-clock-countdown text-base text-emerald-400"></i> 2. Kỷ Luật (Checkin & Đúng Hẹn)
+                        </div>
+                        <div class="text-xs text-slate-300 space-y-2.5">
+                            <div class="bg-slate-900 p-2 rounded-lg border border-slate-800 shadow-2xs">
+                                <span class="font-bold text-slate-400">TB Checkin:</span> <strong class="text-emerald-400">${avgCheckin}%</strong> | <span class="font-bold text-slate-400">Đúng hẹn:</span> <strong class="text-emerald-400">${avgDungHen}%</strong>
+                            </div>
+                            <div>
+                                <div class="font-extrabold text-rose-400 mb-1 flex items-center gap-1"><i class="ph ph-warning-circle"></i> Checkin < 50% (${underCheckin.length}):</div>
+                                <div class="leading-relaxed">${underCheckinNames || '<span class="text-emerald-400 font-semibold">Không có ai vi phạm.</span>'}</div>
+                            </div>
+                            <div class="pt-2 border-t border-slate-800">
+                                <div class="font-extrabold text-amber-400 mb-1 flex items-center gap-1"><i class="ph ph-calendar-x"></i> Đúng hẹn < 95% (${underDungHen.length}):</div>
+                                <div class="leading-relaxed">${underDungHenNames || '<span class="text-emerald-400 font-semibold">Không có ai vi phạm.</span>'}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-4 rounded-xl border border-slate-800 bg-slate-950/60 flex flex-col justify-between shadow-sm">
+                    <div>
+                        <div class="flex items-center gap-2 text-amber-400 font-black text-xs uppercase tracking-wider mb-3 pb-2 border-b border-slate-800">
+                            <i class="ph ph-shield-check text-base text-amber-400"></i> 3. Chất Lượng Kỹ Thuật & CSAT
+                        </div>
+                        <div class="text-xs text-slate-300 space-y-2.5">
+                            <div>
+                                <div class="font-extrabold text-orange-400 mb-1 flex items-center gap-1"><i class="ph ph-shield-warning"></i> Lặp 2 vượt 8% (${overLap2.length}):</div>
+                                <div class="leading-relaxed">${overLap2Names || '<span class="text-emerald-400 font-semibold">Tốt, không ai vượt 8%.</span>'}</div>
+                            </div>
+                            <div class="pt-2 border-t border-slate-800">
+                                <div class="font-extrabold text-red-400 mb-1 flex items-center gap-1"><i class="ph ph-user-minus"></i> CSAT L2 thấp <60% (${underCSAT.length}):</div>
+                                <div class="leading-relaxed">${underCSATNames || '<span class="text-emerald-400 font-semibold">Tất cả nhân viên đạt CSAT L2 >= 60%.</span>'}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const topPerformersCount = topNSLD ? topNSLD.split('</span>').length - 1 : 0;
+            const totalViolations = underNSLD.length + underCheckin.length + underDungHen.length + overLap2.length + underCSAT.length;
+            
+            document.getElementById('executiveSummary').innerHTML = `
+                <div class="flex items-start gap-2">
+                    <i class="ph ph-target text-amber-400 text-base mt-0.5 shrink-0"></i>
+                    <div><strong>Tổng quan điều hành:</strong> Toàn khu vực có <strong class="text-white">${totalStaff} nhân sự</strong> hoạt động với năng suất lao động trung bình đạt <strong class="text-blue-400">${avgNSLD}</strong> điểm. Chi nhánh đang sở hữu <strong class="text-emerald-400">${topPerformersCount} nhân sự xuất sắc</strong> làm nòng cốt giữ vững hiệu suất.</div>
+                </div>
+                <div class="flex items-start gap-2 pt-1.5">
+                    <i class="ph ph-chart-polar text-blue-400 text-base mt-0.5 shrink-0"></i>
+                    <div><strong>Đánh giá các nhóm KPI:</strong> 
+                        Về <em>kỷ luật</em>, tỷ lệ Checkin sớm trung bình đạt <strong class="text-emerald-400">${avgCheckin}%</strong> và Đúng hẹn đạt <strong class="text-emerald-400">${avgDungHen}%</strong>. 
+                        Về <em>chất lượng kỹ thuật & dịch vụ</em>, cần tiếp tục kiểm soát chặt tỷ lệ lặp công đoạn (Lặp 2, Lặp 3) và điểm hài lòng khách hàng (CSAT L2) để nâng cao chất lượng dịch vụ toàn diện.
+                    </div>
+                </div>
+                <div class="flex items-start gap-2 pt-1.5">
+                    <i class="ph ph-lightning text-amber-400 text-base mt-0.5 shrink-0"></i>
+                    <div><strong>Định hướng hành động:</strong> Có tổng cộng <strong class="text-rose-400">${totalViolations} lượt cảnh báo</strong> cần lưu ý ở các chỉ số thành phần. Đề nghị các cấp quản lý trực tiếp đôn đốc, sát sao hỗ trợ các nhân sự chưa đạt chuẩn để tối ưu hóa toàn bộ các chỉ tiêu KPI trong chu kỳ tới.</div>
+                </div>
+            `;
+        }
+
+        function renderSummary(data) {
+            const totalStaff = data.length;
+            if (totalStaff === 0) return;
+
+            const avg = (key) => (data.reduce((sum, row) => sum + (parseFloat(row[key]) || 0), 0) / totalStaff).toFixed(1);
+            const avg2 = (key) => (data.reduce((sum, row) => sum + (parseFloat(row[key]) || 0), 0) / totalStaff).toFixed(2);
+
+            const vNSLD = parseFloat(avg2('NSLD'));
+            const vCheckin = parseFloat(avg('CheckinSom'));
+            const vKyKeo = parseFloat(avg('KyKeo'));
+            const vDongSom = parseFloat(avg('DongSom'));
+            const vRptBt = parseFloat(avg('RptBt'));
+            const vRptTk = parseFloat(avg('RptTk'));
+            const vQua24h = parseFloat(avg('Qua24h'));
+            const vDungHen = parseFloat(avg('DungHen'));
+            const vLap2 = parseFloat(avg('Lap2'));
+            const vLap3 = parseFloat(avg('Lap3'));
+            const vCsatL2 = parseFloat(avg('CsatL2'));
+
+            const fmtCell = (val, suffix, isPassed, passText = 'Phát huy', failText = 'Cần cải thiện') => {
+                if (isPassed) {
+                    return `
+                        <div class="text-base font-black text-emerald-400">${val}${suffix}</div>
+                        <div class="text-[10px] font-bold text-emerald-500 uppercase mt-0.5 flex items-center justify-center gap-0.5"><i class="ph ph-trend-up"></i> ${passText}</div>
+                    `;
+                } else {
+                    return `
+                        <div class="text-base font-black text-rose-400">${val}${suffix}</div>
+                        <div class="text-[10px] font-bold text-rose-500 uppercase mt-0.5 flex items-center justify-center gap-0.5"><i class="ph ph-warning"></i> ${failText}</div>
+                    `;
+                }
+            };
+
+            document.getElementById('summaryCards').innerHTML = `
+                <tr class="text-center">
+                    <td class="px-2 py-3 border-r border-slate-800 bg-slate-900/60">${fmtCell(vNSLD, '', vNSLD >= 7)}</td>
+                    <td class="px-2 py-3 border-r border-slate-800 bg-slate-900/60">${fmtCell(vCheckin, '%', vCheckin >= 50)}</td>
+                    <td class="px-2 py-3 border-r border-slate-800 bg-slate-900/60">${fmtCell(vKyKeo, '%', vKyKeo >= 40)}</td>
+                    <td class="px-2 py-3 border-r border-slate-800 bg-slate-900/60">${fmtCell(vDongSom, '', vDongSom >= targetDongSomCurrent)}</td>
+                    <td class="px-2 py-3 border-r border-slate-800 bg-slate-900/60">${fmtCell(vRptBt, '', vRptBt <= 8)}</td>
+                    <td class="px-2 py-3 border-r border-slate-800 bg-slate-900/60">${fmtCell(vRptTk, '', vRptTk <= 24)}</td>
+                    <td class="px-2 py-3 border-r border-slate-800 bg-slate-900/60">${fmtCell(vQua24h, '%', vQua24h < 5)}</td>
+                    <td class="px-2 py-3 border-r border-slate-800 bg-slate-900/60">${fmtCell(vDungHen, '%', vDungHen >= 95)}</td>
+                    <td class="px-2 py-3 border-r border-slate-800 bg-slate-900/60">${fmtCell(vLap2, '%', vLap2 < 8)}</td>
+                    <td class="px-2 py-3 border-r border-slate-800 bg-slate-900/60">${fmtCell(vLap3, '%', vLap3 === 0)}</td>
+                    <td class="px-2 py-3 bg-slate-900/60">${fmtCell(vCsatL2, '%', vCsatL2 >= 60)}</td>
+                </tr>
+            `;
+        }
+
+        function renderCharts(data) {
+            const chartData = data.slice(0, 12);
+            const labels = chartData.map(row => row.NameStr.split('.')[1] || row.NameStr);
+
+            if(nsldChartInstance) nsldChartInstance.destroy();
+            if(rptChartInstance) rptChartInstance.destroy();
+
+            const ctxNsld = document.getElementById('nsldChart').getContext('2d');
+            nsldChartInstance = new Chart(ctxNsld, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'NSLD',
+                        data: chartData.map(row => row.NSLD),
+                        backgroundColor: chartData.map(row => row.NSLD >= 7 ? 'rgba(16, 185, 129, 0.85)' : 'rgba(239, 68, 68, 0.85)'),
+                        borderRadius: 6
+                    }]
+                },
+                options: { 
+                    responsive: true, 
+                    plugins: { legend: { display: false } },
+                    scales: { 
+                        y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8' } }, 
+                        x: { grid: { display: false }, ticks: { color: '#94a3b8' } } 
+                    }
+                }
+            });
+
+            const ctxRpt = document.getElementById('rptChart').getContext('2d');
+            rptChartInstance = new Chart(ctxRpt, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'RPT Bảo Trì', data: chartData.map(row => row.RptBt), backgroundColor: 'rgba(59, 130, 246, 0.85)', borderRadius: 4 },
+                        { label: 'RPT Triển Khai', data: chartData.map(row => row.RptTk), backgroundColor: 'rgba(245, 158, 11, 0.85)', borderRadius: 4 }
+                    ]
+                },
+                options: { 
+                    responsive: true,
+                    scales: { 
+                        y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8' } }, 
+                        x: { grid: { display: false }, ticks: { color: '#94a3b8' } } 
+                    }
+                }
+            });
+        }
+
+        // --- TOOLBAR & BẢNG ---
+        document.getElementById('filterSelect').addEventListener('change', applySearch);
+        document.getElementById('searchInput').addEventListener('input', applySearch);
+
+        function applySearch() {
+            const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
+            const filterMode = document.getElementById('filterSelect').value;
+            
+            let result = globalData.filter(row => row.NameStr.toLowerCase().includes(keyword));
+            
+            if (filterMode === 'kpi_desc') {
+                result.sort((a, b) => b.PassedKPIs - a.PassedKPIs || b.NSLD - a.NSLD);
+            } else if (filterMode === 'kpi_asc') {
+                result.sort((a, b) => a.PassedKPIs - b.PassedKPIs || a.NSLD - b.NSLD);
+            } else {
+                if (!sortAlphabet) {
+                    result.sort((a, b) => b.PassedKPIs - a.PassedKPIs || b.NSLD - a.NSLD);
+                } else {
+                    result.sort((a, b) => a.NameStr.localeCompare(b.NameStr));
+                }
+            }
+
+            filteredData = result;
+            renderStaffProfile(keyword, filteredData);
+            updateTable();
+        }
+
+        function renderStaffProfile(keyword, results) {
+            const container = document.getElementById('staffProfileContainer');
+            
+            if (keyword === '' || results.length === 0) {
+                container.classList.add('hidden');
+                container.innerHTML = '';
+                return;
+            }
+
+            container.classList.remove('hidden');
+            const row = results[0];
+
+            let strengths = [];
+            let weaknesses = [];
+
+            if (row.NSLD >= 7) strengths.push(`Năng suất lao động đạt chuẩn (${row.NSLD} >= 7)`);
+            else weaknesses.push(`NSLD đang ở mức ${row.NSLD} (chưa đạt chuẩn >= 7)`);
+
+            if (row.CheckinSom >= 50) strengths.push(`Checkin sớm đạt yêu cầu (${row.CheckinSom}%)`);
+            else weaknesses.push(`Tỷ lệ Checkin sớm là ${row.CheckinSom}% (chưa đạt chuẩn >= 50%)`);
+
+            if (row.KyKeo >= 40) strengths.push(`Tỷ lệ ký kéo đạt chuẩn (${row.KyKeo}%)`);
+            else weaknesses.push(`Tỷ lệ ký kéo là ${row.KyKeo}% (chưa đạt chuẩn >= 40%)`);
+
+            if (row.DongSom >= targetDongSomCurrent) strengths.push(`Số lượng đóng sớm đạt định mức (${row.DongSom} case)`);
+            else weaknesses.push(`Số lượng đóng sớm là ${row.DongSom} case (định mức khoảng ${Math.round(targetDongSomCurrent)} case)`);
+
+            if (row.RptBt <= 8) strengths.push(`RPT Bảo Trì tốt (${row.RptBt})`);
+            else weaknesses.push(`RPT Bảo Trì đang là ${row.RptBt} (vượt chuẩn <= 8)`);
+
+            if (row.RptTk <= 24) strengths.push(`RPT Triển Khai tốt (${row.RptTk})`);
+            else weaknesses.push(`RPT Triển Khai đang là ${row.RptTk} (vượt chuẩn <= 24)`);
+
+            if (row.Qua24h < 5) strengths.push(`Tỷ lệ quá 24h kiểm soát tốt (${row.Qua24h}%)`);
+            else weaknesses.push(`Tỷ lệ phiếu tồn quá 24h là ${row.Qua24h}% (vượt chuẩn < 5%)`);
+
+            if (row.DungHen >= 95) strengths.push(`Tỷ lệ đúng hẹn cao (${row.DungHen}%)`);
+            else weaknesses.push(`Tỷ lệ đúng hẹn là ${row.DungHen}% (chưa đạt chuẩn >= 95%)`);
+
+            if (row.Lap2 < 8) strengths.push(`Lỗi Lặp 2 kiểm soát tốt (${row.Lap2}%)`);
+            else weaknesses.push(`Tỷ lệ lỗi Lặp 2 là ${row.Lap2}% (vượt chuẩn < 8%)`);
+
+            if (row.Lap3 === 0) strengths.push(`Tuyệt đối không có lỗi Lặp 3 (0%)`);
+            else weaknesses.push(`Đang phát sinh lỗi Lặp 3 (${row.Lap3}%)`);
+
+            if (row.CsatL2 >= 60) strengths.push(`Điểm CSAT L2 đạt yêu cầu (${row.CsatL2}%)`);
+            else weaknesses.push(`Điểm CSAT L2 đạt ${row.CsatL2}% (chưa đạt chuẩn >= 60%)`);
+
+            if (row.CSAT12 < 3) strengths.push(`Tỷ lệ phản hồi xấu CSAT 1,2 thấp an toàn (${row.CSAT12}%)`);
+            else weaknesses.push(`Tỷ lệ CSAT 1,2 đang ở mức ${row.CSAT12}% (vượt chuẩn < 3%)`);
+
+            const strengthHtml = strengths.length > 0 ? strengths.map(s => `<li class="flex items-start gap-1.5 text-emerald-400"><i class="ph ph-check-circle text-sm mt-0.5 shrink-0"></i> <span>${s}</span></li>`).join('') : '<li class="text-slate-500 italic">Không có</li>';
+            
+            let weaknessHtml = '';
+            if (weaknesses.length > 0) {
+                const listItems = weaknesses.map(w => `<li class="flex items-start gap-1.5 text-amber-400"><i class="ph ph-info text-sm mt-0.5 shrink-0"></i> <span>${w}</span></li>`).join('');
+                
+                const closingMsg = weaknesses.length <= 2 
+                    ? "Đang vướng một chút ở các mục này, em chú ý cải thiện thêm xíu là đẹp nhé!" 
+                    : "Đang tồn khá nhiều KPI chưa tốt, anh em cùng nhìn nhận lại xem đang vướng khó khăn gì thì mạnh dạn chia sẻ để hỗ trợ xử lý dứt điểm nhé!";
+
+                weaknessHtml = `
+                    <ul class="space-y-1.5 mb-3">
+                        ${listItems}
+                    </ul>
+                    <div class="pt-2.5 border-t border-slate-800 text-slate-300 font-medium italic flex items-center gap-1.5 bg-slate-950/80 p-2.5 rounded-lg border border-slate-800">
+                        <i class="ph ph-chat-teardrop-text text-blue-400 text-base shrink-0"></i>
+                        <span>${closingMsg}</span>
+                    </div>
+                `;
+            } else {
+                weaknessHtml = `<div class="text-emerald-400 flex items-center gap-1.5"><i class="ph ph-check-circle text-sm"></i> Tuyệt vời, hoàn thành xuất sắc tất cả chỉ tiêu!</div>`;
+            }
+
+            container.innerHTML = `
+                <div class="bg-slate-900 border border-slate-700/80 rounded-xl p-5 shadow-xl relative overflow-hidden">
+                    <div class="absolute top-0 left-0 w-1.5 h-full ${weaknesses.length > 0 ? 'bg-amber-500' : 'bg-emerald-500'}"></div>
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 pb-3 border-b border-slate-800">
+                        <div class="flex items-center gap-3">
+                            <div class="p-2.5 ${weaknesses.length > 0 ? 'bg-amber-600' : 'bg-emerald-600'} text-white rounded-xl shadow-md">
+                                <i class="ph ph-user text-xl"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-base font-extrabold text-white flex items-center gap-2">
+                                    ${row.NameStr} 
+                                    <span class="px-2 py-0.5 text-xs font-bold rounded ${row.PassedKPIs >= 8 ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-red-950 text-red-300 border border-red-900'}">Đạt ${row.PassedKPIs}/11 KPI</span>
+                                </h3>
+                                <p class="text-xs text-slate-400 mt-0.5">Gợi ý đồng hành và hỗ trợ cải thiện hiệu suất cá nhân</p>
+                            </div>
+                        </div>
+                        <div class="text-xs text-slate-400 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
+                            Kết quả tìm kiếm: <strong class="text-white">${results.length}</strong> nhân sự khớp từ khóa
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                        <div class="bg-slate-950/70 p-3.5 rounded-xl border border-slate-800 flex flex-col justify-between">
+                            <div>
+                                <div class="font-extrabold text-emerald-400 mb-2.5 flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
+                                    <i class="ph ph-thumbs-up text-sm"></i> Các chỉ số đang làm tốt:
+                                </div>
+                                <ul class="space-y-1.5">
+                                    ${strengthHtml}
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="bg-slate-950/70 p-3.5 rounded-xl border border-slate-800 flex flex-col justify-between">
+                            <div>
+                                <div class="font-extrabold text-amber-400 mb-2.5 flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
+                                    <i class="ph ph-chats-circle text-sm"></i> Gợi ý đồng hành & Hỗ trợ cải thiện:
+                                </div>
+                                ${weaknessHtml}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        document.getElementById('sortBtn').addEventListener('click', function() {
+            sortAlphabet = !sortAlphabet;
+            const icon = this.querySelector('i');
+            if (sortAlphabet) {
+                icon.className = 'ph ph-sort-descending text-sm';
+                this.innerHTML = `<i class="ph ph-sort-descending text-sm"></i> Sắp xếp Z-A`;
+            } else {
+                icon.className = 'ph ph-sort-ascending text-sm';
+                this.innerHTML = `<i class="ph ph-sort-ascending text-sm"></i> Sắp xếp A-Z`;
+            }
+            applySearch();
+        });
+
+        // --- XUẤT ẢNH BẢNG CHI TIẾT ---
+        document.getElementById('exportImgBtn').addEventListener('click', function() {
+            const targetElement = document.getElementById('exportTableContainer');
+            const noExportItems = targetElement.querySelectorAll('.no-export');
+            const stickyCells = targetElement.querySelectorAll('.sticky-col');
+            
+            noExportItems.forEach(el => el.style.display = 'none');
+            stickyCells.forEach(el => {
+                el.style.position = 'static';
+                el.style.boxShadow = 'none';
+            });
+
+            const btn = this;
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = `<i class="ph ph-spinner animate-spin text-sm"></i> Đang xuất...`;
+            btn.disabled = true;
+
+            html2canvas(targetElement, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: '#0f172a'
+            }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = `Bang-KPI-Khu-Vuc-TAIHD-${new Date().toISOString().slice(0,10)}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+
+                noExportItems.forEach(el => el.style.display = '');
+                stickyCells.forEach(el => {
+                    el.style.position = 'sticky';
+                    el.style.boxShadow = '1px_0_0_0_#1e293b';
+                });
+
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+            }).catch(err => {
+                console.error("Lỗi xuất ảnh:", err);
+                alert("Có lỗi xảy ra khi xuất ảnh!");
+                noExportItems.forEach(el => el.style.display = '');
+                stickyCells.forEach(el => {
+                    el.style.position = 'sticky';
+                    el.style.boxShadow = '1px_0_0_0_#1e293b';
+                });
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+            });
+        });
+
+        // --- XUẤT ẢNH PHẦN ĐÁNH GIÁ HIỆU SUẤT ---
+        document.getElementById('exportInsightsBtn').addEventListener('click', function() {
+            const targetElement = document.getElementById('exportInsightsContainer');
+            const btn = this;
+            const originalHTML = btn.innerHTML;
+            
+            btn.style.display = 'none';
+            btn.innerHTML = `<i class="ph ph-spinner animate-spin text-sm"></i> Đang xuất...`;
+            btn.disabled = true;
+
+            html2canvas(targetElement, {
+                scale: 2,
+                useCORS: true,
+                backgroundColor: '#0f172a'
+            }).then(canvas => {
+                const link = document.createElement('a');
+                link.download = `Bao-Cao-Tong-Quan-KPI-TAIHD-${new Date().toISOString().slice(0,10)}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+
+                btn.style.display = '';
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+            }).catch(err => {
+                console.error("Lỗi xuất ảnh đánh giá:", err);
+                alert("Có lỗi xảy ra khi xuất ảnh!");
+                btn.style.display = '';
+                btn.innerHTML = originalHTML;
+                btn.disabled = false;
+            });
+        });
+
+        function updateTable() {
+            const tbody = document.getElementById('tableBody');
+            
+            if (filteredData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="14" class="px-3 py-6 text-center text-slate-500">Không tìm thấy dữ liệu phù hợp.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = filteredData.map(row => {
+                const kpiBadge = `<span class="inline-flex items-center justify-center px-2 py-0.5 text-[11px] font-bold rounded ${row.PassedKPIs >= 8 ? 'bg-emerald-950 text-emerald-300 border border-emerald-800' : 'bg-red-950 text-red-300 border border-red-900'}">${row.PassedKPIs}/11</span>`;
+
+                const nsldFmt = row.NSLD >= 7 
+                    ? `<span class="font-bold text-emerald-400">${row.NSLD}</span>` 
+                    : `<span class="font-bold text-red-400">${row.NSLD}</span>`;
+                
+                const checkinFmt = row.CheckinSom >= 50 
+                    ? `<span class="font-medium text-emerald-400">${row['Checkin Sớm >50%']}</span>` 
+                    : `<span class="font-medium text-red-400">${row['Checkin Sớm >50%']}</span>`;
+                
+                const kyKeoFmt = row.KyKeo >= 40 
+                    ? `<span class="font-medium text-emerald-400">${row['% Ký Kéo 40%']}</span>` 
+                    : `<span class="font-medium text-red-400">${row['% Ký Kéo 40%']}</span>`;
+
+                const dongSomFmt = row.DongSom >= targetDongSomCurrent 
+                    ? `<span class="font-medium text-emerald-400">${row.DongSom}</span>` 
+                    : `<span class="font-medium text-red-400">${row.DongSom}</span>`;
+
+                const rptBtFmt = row.RptBt <= 8
+                    ? `<span class="font-medium text-emerald-400">${row['RPT BT']}</span>`
+                    : `<span class="font-medium text-red-400">${row['RPT BT']}</span>`;
+
+                const rptTkFmt = row.RptTk <= 24
+                    ? `<span class="font-medium text-emerald-400">${row['RPT TK']}</span>`
+                    : `<span class="font-medium text-red-400">${row['RPT TK']}</span>`;
+
+                const qua24hFmt = row.Qua24h < 5 
+                    ? `<span class="font-medium text-emerald-400">${row['% QUÁ 24h <5%']}</span>` 
+                    : `<span class="font-medium text-red-400">${row['% QUÁ 24h <5%']}</span>`;
+
+                const dungHenFmt = row.DungHen >= 95 
+                    ? `<span class="font-medium text-emerald-400">${row['% Đúng Hẹn']}</span>` 
+                    : `<span class="font-medium text-red-400">${row['% Đúng Hẹn']}</span>`;
+
+                const lap2Fmt = row.Lap2 < 8 
+                    ? `<span class="font-medium text-emerald-400">${row['% LẶP 2 (<8%)']}</span>` 
+                    : `<span class="font-bold text-red-400">${row['% LẶP 2 (<8%)']}</span>`;
+
+                const lap3Fmt = row.Lap3 === 0
+                    ? `<span class="font-medium text-emerald-400">${row['% LẶP 3']}</span>` 
+                    : `<span class="font-bold text-red-400">${row['% LẶP 3']}</span>`;
+
+                const csatL2Fmt = row.CsatL2 >= 60
+                    ? `<span class="font-medium text-emerald-400">${row['% CSAT L2']}</span>`
+                    : `<span class="font-medium text-red-400">${row['% CSAT L2']}</span>`;
+
+                const csat12Fmt = row.CSAT12 < 3 
+                    ? `<span class="font-medium text-emerald-400">${row['% CSAT 1,2 <3%']}</span>` 
+                    : `<span class="font-medium text-red-400">${row['% CSAT 1,2 <3%']}</span>`;
+
+                return `
+                <tr class="hover:bg-slate-800/60 transition-colors">
+                    <td class="px-3 py-2.5 font-bold text-blue-400 whitespace-nowrap sticky-col bg-slate-900 border-r border-b border-slate-800">
+                        ${row.NameStr}
+                    </td>
+                    <td class="px-2 py-2.5 text-center whitespace-nowrap border-r border-b border-slate-800 bg-slate-950/40">${kpiBadge}</td>
+                    <td class="px-2 py-2.5 whitespace-nowrap border-r border-b border-slate-800">${nsldFmt}</td>
+                    <td class="px-2 py-2.5 whitespace-nowrap border-r border-b border-slate-800">${checkinFmt}</td>
+                    <td class="px-2 py-2.5 whitespace-nowrap border-r border-b border-slate-800">${kyKeoFmt}</td>
+                    <td class="px-2 py-2.5 whitespace-nowrap border-r border-b border-slate-800">${dongSomFmt}</td>
+                    <td class="px-2 py-2.5 whitespace-nowrap border-r border-b border-slate-800">${rptBtFmt}</td>
+                    <td class="px-2 py-2.5 whitespace-nowrap border-r border-b border-slate-800">${rptTkFmt}</td>
+                    <td class="px-2 py-2.5 whitespace-nowrap border-r border-b border-slate-800">${qua24hFmt}</td>
+                    <td class="px-2 py-2.5 whitespace-nowrap border-r border-b border-slate-800">${dungHenFmt}</td>
+                    <td class="px-2 py-2.5 whitespace-nowrap border-r border-b border-slate-800">${lap2Fmt}</td>
+                    <td class="px-2 py-2.5 whitespace-nowrap border-r border-b border-slate-800">${lap3Fmt}</td>
+                    <td class="px-2 py-2.5 whitespace-nowrap border-r border-b border-slate-800">${csatL2Fmt}</td>
+                    <td class="px-2 py-2.5 whitespace-nowrap border-b border-slate-800">${csat12Fmt}</td>
+                </tr>
+            `}).join('');
+        }
+    </script>
+</body>
+</html>
