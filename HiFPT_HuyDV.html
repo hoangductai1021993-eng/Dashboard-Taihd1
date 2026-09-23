@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FPT Telecom Huế - Dashboard Tổng Hợp Vận Hành Kỹ Thuật & Hủy Dịch Vụ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        fpt: { orange: '#f15a24', dark: '#111827', blue: '#0284c7' }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans antialiased min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="bg-slate-800 border-b border-slate-700 sticky top-0 z-50 shadow-md">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center gap-3">
+            <div class="flex items-center space-x-3">
+                <div class="bg-orange-600 text-white p-2.5 rounded-xl shadow-lg font-bold text-xl flex items-center justify-center">
+                    <i class="fa-solid fa-chart-line"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg md:text-xl font-bold tracking-tight text-white">FPT TELECOM HUẾ — DASHBOARD TỔNG HỢP VẬN HÀNH</h1>
+                    <p class="text-xs text-slate-400">Triển Khai, Bảo Trì & Phân Tích Ca Vụ Hủy | Quản lý: TÀI HD1</p>
+                </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <!-- File Upload Button for KPI/Hifpt -->
+                <label class="bg-orange-600 hover:bg-orange-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center space-x-1 cursor-pointer shadow">
+                    <i class="fa-solid fa-file-excel"></i>
+                    <span>Nạp Excel Kỹ Thuật</span>
+                    <input type="file" id="excelFile" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleFileUpload(event)">
+                </label>
+
+                <!-- File Upload Button for Cancellations -->
+                <label class="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center space-x-1 cursor-pointer shadow">
+                    <i class="fa-solid fa-upload"></i>
+                    <span>Nạp Excel Ca Hủy</span>
+                    <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleCancelFileUpload(event)">
+                </label>
+
+                <button onclick="window.print()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center space-x-1">
+                    <i class="fa-solid fa-print"></i> <span>In</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl w-full mx-auto px-4 py-6 space-y-6 flex-1">
+        <!-- Navigation Tabs -->
+        <div class="flex space-x-2 border-b border-slate-700 pb-3 overflow-x-auto">
+            <button onclick="switchTab('overview')" id="tab-btn-overview" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold bg-orange-600 text-white shadow-md transition flex items-center space-x-2 whitespace-nowrap">
+                <i class="fa-solid fa-gauge"></i> <span>Tổng Quan Hệ Thống</span>
+            </button>
+            <button onclick="switchTab('deployment')" id="tab-btn-deployment" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition flex items-center space-x-2 whitespace-nowrap">
+                <i class="fa-solid fa-network-wired"></i> <span>Triển Khai Riêng (TK)</span>
+            </button>
+            <button onclick="switchTab('maintenance')" id="tab-btn-maintenance" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition flex items-center space-x-2 whitespace-nowrap">
+                <i class="fa-solid fa-screwdriver-wrench"></i> <span>Bảo Trì Riêng (BT)</span>
+            </button>
+            <button onclick="switchTab('cancellations')" id="tab-btn-cancellations" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition flex items-center space-x-2 whitespace-nowrap">
+                <i class="fa-solid fa-ban text-red-400"></i> <span>Phân Tích Ca Vụ Hủy</span>
+            </button>
+            <button onclick="switchTab('weakness')" id="tab-btn-weakness" class="tab-btn px-4 py-2 rounded-lg text-sm font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition flex items-center space-x-2 whitespace-nowrap relative">
+                <i class="fa-solid fa-triangle-exclamation text-amber-400"></i> <span>Nhân Sự Yếu Kém</span>
+                <span id="weak-badge" class="ml-1 px-1.5 py-0.5 bg-red-600 text-white rounded-full text-xs">7</span>
+            </button>
+        </div>
+
+        <!-- TAB 1: OVERVIEW -->
+        <div id="tab-overview" class="tab-content space-y-6">
+            <!-- KPI Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-sm">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-xs font-semibold uppercase text-slate-400 tracking-wider">Tổng Nhân Sự</p>
+                            <h3 id="statTotalStaff" class="text-3xl font-extrabold text-white mt-1">24</h3>
+                        </div>
+                        <div class="p-3 bg-blue-500/10 text-blue-400 rounded-lg">
+                            <i class="fa-solid fa-users text-lg"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-xs text-slate-400 flex items-center">
+                        <span class="text-emerald-400 font-semibold mr-1"><i class="fa-solid fa-arrow-up"></i> 100%</span> Hoạt động ổn định
+                    </div>
+                </div>
+
+                <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-sm">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-xs font-semibold uppercase text-slate-400 tracking-wider">Tổng Triển Khai (TK)</p>
+                            <h3 id="statTotalTK" class="text-3xl font-extrabold text-orange-400 mt-1">389</h3>
+                        </div>
+                        <div class="p-3 bg-orange-500/10 text-orange-400 rounded-lg">
+                            <i class="fa-solid fa-network-wired text-lg"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-xs text-slate-400 flex items-center">
+                        <span class="text-amber-400 font-semibold mr-1">5.66%</span> Chưa kích hoạt trung bình
+                    </div>
+                </div>
+
+                <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-sm">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-xs font-semibold uppercase text-slate-400 tracking-wider">Tổng Bảo Trì (BT)</p>
+                            <h3 id="statTotalBT" class="text-3xl font-extrabold text-cyan-400 mt-1">1,292</h3>
+                        </div>
+                        <div class="p-3 bg-cyan-500/10 text-cyan-400 rounded-lg">
+                            <i class="fa-solid fa-screwdriver-wrench text-lg"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-xs text-slate-400 flex items-center">
+                        <span class="text-emerald-400 font-semibold mr-1">95.18%</span> Kích hoạt trước BT
+                    </div>
+                </div>
+
+                <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-sm">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <p class="text-xs font-semibold uppercase text-slate-400 tracking-wider">Tổng Ca Vụ Hủy</p>
+                            <h3 id="statTotalCancel" class="text-3xl font-extrabold text-red-400 mt-1">0</h3>
+                        </div>
+                        <div class="p-3 bg-red-500/10 text-red-400 rounded-lg">
+                            <i class="fa-solid fa-ban text-lg"></i>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-xs text-slate-400 flex items-center">
+                        <span id="statTotalCancelValue" class="text-rose-400 font-semibold mr-1">0 đ</span> Thiệt hại cước
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Section -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-sm">
+                    <h3 class="text-base font-bold text-white mb-4 flex items-center">
+                        <i class="fa-solid fa-chart-bar text-orange-500 mr-2"></i> Khối lượng công việc Top 10 Nhân Sự
+                    </h3>
+                    <div class="relative h-80">
+                        <canvas id="topVolumeChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800 border border-slate-700 rounded-xl p-5 shadow-sm">
+                    <h3 class="text-base font-bold text-white mb-4 flex items-center">
+                        <i class="fa-solid fa-chart-pie text-cyan-500 mr-2"></i> Tỷ lệ Tồn đọng / Chưa kích hoạt TK & BT
+                    </h3>
+                    <div class="relative h-80">
+                        <canvas id="unactivatedRatioChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: DEPLOYMENT (TRIỂN KHAI RIÊNG) -->
+        <div id="tab-deployment" class="tab-content hidden space-y-6">
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 shadow-sm">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                    <div>
+                        <h3 class="text-lg font-bold text-white flex items-center">
+                            <i class="fa-solid fa-network-wired text-orange-500 mr-2"></i> Chi Tiết Mảng Triển Khai Riêng (TK)
+                        </h3>
+                        <p class="text-xs text-slate-400 mt-1">Theo dõi tiến độ bàn giao, tỷ lệ kích hoạt trước và trong quá trình triển khai.</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <select id="sortDeployment" onchange="sortTable('deployment')" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500">
+                            <option value="default">Sắp xếp mặc định</option>
+                            <option value="name_asc">Tên nhân sự (A - Z)</option>
+                            <option value="name_desc">Tên nhân sự (Z - A)</option>
+                            <option value="total_desc">Tổng TK (Cao -> Thấp)</option>
+                            <option value="unact_desc">% Chưa kích hoạt (Cao -> Thấp)</option>
+                        </select>
+                        <input type="text" id="searchDeployment" placeholder="Tìm kiếm nhân sự..." onkeyup="filterTable('deployment')" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-orange-500">
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table id="tableDeployment" class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-slate-900/70 text-slate-400 uppercase tracking-wider border-b border-slate-700">
+                                <th class="p-3">Nhân Sự</th>
+                                <th class="p-3 text-center">Tổng TK</th>
+                                <th class="p-3 text-center">Kích Trước TK</th>
+                                <th class="p-3 text-center">% Trước TK</th>
+                                <th class="p-3 text-center">Kích Khi TK</th>
+                                <th class="p-3 text-center">% Khi TK</th>
+                                <th class="p-3 text-center">Chưa Kích TK</th>
+                                <th class="p-3 text-center">% Chưa Kích</th>
+                                <th class="p-3 text-center">Trạng Thái</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyDeployment" class="divide-y divide-slate-700/50"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: MAINTENANCE (BẢO TRÌ RIÊNG) -->
+        <div id="tab-maintenance" class="tab-content hidden space-y-6">
+            <div class="bg-slate-800 border border-slate-700 rounded-xl p-6 shadow-sm">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                    <div>
+                        <h3 class="text-lg font-bold text-white flex items-center">
+                            <i class="fa-solid fa-screwdriver-wrench text-cyan-500 mr-2"></i> Chi Tiết Mảng Bảo Trì Riêng (BT)
+                        </h3>
+                        <p class="text-xs text-slate-400 mt-1">Theo dõi khối lượng xử lý sự cố, tỷ lệ kích hoạt trước và thời gian phản hồi SLA.</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <select id="sortMaintenance" onchange="sortTable('maintenance')" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
+                            <option value="default">Sắp xếp mặc định</option>
+                            <option value="name_asc">Tên nhân sự (A - Z)</option>
+                            <option value="name_desc">Tên nhân sự (Z - A)</option>
+                            <option value="total_desc">Tổng BT (Cao -> Thấp)</option>
+                            <option value="unact_desc">% Chưa kích hoạt (Cao -> Thấp)</option>
+                        </select>
+                        <input type="text" id="searchMaintenance" placeholder="Tìm kiếm nhân sự..." onkeyup="filterTable('maintenance')" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500">
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table id="tableMaintenance" class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-slate-900/70 text-slate-400 uppercase tracking-wider border-b border-slate-700">
+                                <th class="p-3">Nhân Sự</th>
+                                <th class="p-3 text-center">Tổng BT</th>
+                                <th class="p-3 text-center">Kích Trước BT</th>
+                                <th class="p-3 text-center">% Trước BT</th>
+                                <th class="p-3 text-center">Kích Khi BT</th>
+                                <th class="p-3 text-center">% Khi BT</th>
+                                <th class="p-3 text-center">Chưa Kích BT</th>
+                                <th class="p-3 text-center">% Chưa Kích</th>
+                                <th class="p-3 text-center">Đánh Giá SLA</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbodyMaintenance" class="divide-y divide-slate-700/50"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: CANCELLATIONS (PHÂN TÍCH CA VỤ HỦY) -->
+        <div id="tab-cancellations" class="tab-content hidden space-y-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-slate-800 border border-slate-700 p-5 rounded-xl shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Tổng số ca vụ hủy</p>
+                        <h3 id="kpiTotalCancellations" class="text-2xl font-bold text-white mt-1">0</h3>
+                        <span class="text-xs text-emerald-400 font-medium bg-emerald-500/10 px-2 py-0.5 rounded-full mt-2 inline-block">Đã cập nhật</span>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-red-500/10 text-red-400 flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-ban"></i>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800 border border-slate-700 p-5 rounded-xl shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Tổng giá trị thiệt hại</p>
+                        <h3 id="kpiTotalValue" class="text-xl md:text-2xl font-bold text-white mt-1">0 đ</h3>
+                        <span class="text-xs text-rose-400 font-medium bg-rose-500/10 px-2 py-0.5 rounded-full mt-2 inline-block">Doanh thu mất</span>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-wallet"></i>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800 border border-slate-700 p-5 rounded-xl shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">KTV hủy nhiều nhất</p>
+                        <h3 id="kpiTopEmployee" class="text-sm md:text-base font-bold text-white mt-1 truncate max-w-[140px]">--</h3>
+                        <span id="kpiTopEmployeeCount" class="text-xs text-indigo-400 font-medium bg-indigo-500/10 px-2 py-0.5 rounded-full mt-2 inline-block">0 ca hủy</span>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-user-shield"></i>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800 border border-slate-700 p-5 rounded-xl shadow-sm flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Lý do hủy phổ biến</p>
+                        <h3 id="kpiTopReason" class="text-sm md:text-base font-bold text-white mt-1 truncate max-w-[140px]">--</h3>
+                        <span class="text-xs text-purple-400 font-medium bg-purple-500/10 px-2 py-0.5 rounded-full mt-2 inline-block">Chiếm đa số</span>
+                    </div>
+                    <div class="w-12 h-12 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-clipboard-question"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-slate-800 border border-slate-700 p-6 rounded-xl shadow-sm flex flex-col">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-base font-bold text-white">Phân bố số lượng ca hủy theo Nhân sự KTV</h2>
+                        <span class="text-xs text-slate-400 font-medium">Top KTV</span>
+                    </div>
+                    <div class="relative flex-1 min-h-[320px]">
+                        <canvas id="employeeChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800 border border-slate-700 p-6 rounded-xl shadow-sm flex flex-col">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-base font-bold text-white">Phân bố Nguyên nhân Hủy (RM)</h2>
+                        <span class="text-xs text-slate-400 font-medium">Tỷ lệ phần trăm</span>
+                    </div>
+                    <div class="relative flex-1 min-h-[250px] flex items-center justify-center">
+                        <canvas id="reasonChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Summary Tables for Cancellations -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-slate-800 border border-slate-700 p-6 rounded-xl shadow-sm flex flex-col">
+                    <h2 class="text-base font-bold text-white mb-4">Thống Kê Chi Tiết Nguyên Nhân Hủy (RM)</h2>
+                    <div class="overflow-x-auto max-h-[300px]">
+                        <table class="w-full text-left text-xs text-slate-300">
+                            <thead class="bg-slate-900/70 uppercase text-slate-400 font-semibold sticky top-0">
+                                <tr>
+                                    <th class="p-3">Nguyên Nhân</th>
+                                    <th class="p-3 text-center">Số ca</th>
+                                    <th class="p-3 text-right">Thiệt hại cước</th>
+                                    <th class="p-3 text-right">Tỷ lệ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="reasonTableBody" class="divide-y divide-slate-700/50"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800 border border-slate-700 p-6 rounded-xl shadow-sm flex flex-col">
+                    <h2 class="text-base font-bold text-white mb-4">Thống kê Chi tiết KTV & Thiệt hại Ca Hủy</h2>
+                    <div class="overflow-x-auto max-h-[300px]">
+                        <table class="w-full text-left text-xs text-slate-300">
+                            <thead class="bg-slate-900/70 uppercase text-slate-400 font-semibold sticky top-0">
+                                <tr>
+                                    <th class="p-3">KTV</th>
+                                    <th class="p-3 text-center">Số ca</th>
+                                    <th class="p-3 text-right">Thiệt hại cước</th>
+                                    <th class="p-3 text-right">Tỷ lệ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="employeeTableBody" class="divide-y divide-slate-700/50"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Detailed Cancellations Table -->
+            <div class="bg-slate-800 border border-slate-700 p-6 rounded-xl shadow-sm">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                    <div>
+                        <h2 class="text-base font-bold text-white">Chi tiết Danh sách Ca vụ Hủy & Nội Dung Ghi Nhận</h2>
+                        <p class="text-xs text-slate-400">Tra cứu toàn bộ thông tin chi tiết từng ca vụ</p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                        <div class="relative flex-1 sm:w-60">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                                <i class="fa-solid fa-search text-xs"></i>
+                            </span>
+                            <input type="text" id="searchInput" oninput="triggerCancelUpdate()" placeholder="Tìm KTV, KH, HĐ..." class="w-full pl-9 pr-4 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-indigo-500">
+                        </div>
+                        <select id="filterReason" onchange="triggerCancelUpdate()" class="bg-slate-900 border border-slate-700 text-slate-300 py-1.5 px-3 rounded-lg text-xs focus:outline-none focus:border-indigo-500">
+                            <option value="">Tất cả Nguyên nhân</option>
+                        </select>
+                        <select id="sortKtv" onchange="triggerCancelUpdate()" class="bg-slate-900 border border-slate-700 text-slate-300 py-1.5 px-3 rounded-lg text-xs focus:outline-none focus:border-indigo-500">
+                            <option value="">Sắp xếp KTV (Mặc định)</option>
+                            <option value="asc">KTV: A -> Z</option>
+                            <option value="desc">KTV: Z -> A</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto max-h-[420px]">
+                    <table class="w-full text-left text-xs text-slate-300 relative">
+                        <thead class="bg-slate-900/70 uppercase text-slate-400 font-semibold sticky top-0 z-10">
+                            <tr>
+                                <th class="p-3">Ngày</th>
+                                <th class="p-3">Số HĐ</th>
+                                <th class="p-3">Khách Hàng</th>
+                                <th class="p-3">Nguyên Nhân RM</th>
+                                <th class="p-3 text-right">Giá Cước</th>
+                                <th class="p-3">Nhân Sự KTV</th>
+                                <th class="p-3 text-center">Ghi Nhận</th>
+                            </tr>
+                        </thead>
+                        <tbody id="detailsTableBody" class="divide-y divide-slate-700/50"></tbody>
+                    </table>
+                </div>
+                <div id="noDataNotice" class="hidden text-center py-8 text-slate-400 text-xs">
+                    Không tìm thấy ca vụ hủy phù hợp với bộ lọc.
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 5: WEAKNESS (NHÂN SỰ YẾU KÉM) -->
+        <div id="tab-weakness" class="tab-content hidden space-y-6">
+            <div class="bg-gradient-to-r from-red-950/40 to-slate-800 border border-red-900/50 rounded-xl p-6 shadow-sm">
+                <div class="flex items-center space-x-3 mb-4">
+                    <div class="bg-red-600 text-white p-3 rounded-xl shadow">
+                        <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-white">Danh Sách Nhân Sự Yếu Kém / Tồn Đọng Cao</h3>
+                        <p class="text-xs text-slate-300 mt-0.5">Các nhân sự có tỷ lệ chưa kích hoạt TK > 10% hoặc tỷ lệ lỗi BT cao cần đưa vào diện cải thiện đặc biệt.</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6" id="weakStaffContainer"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal for Notes -->
+    <div id="noteModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-3">
+                <h3 class="font-bold text-white text-base flex items-center space-x-2">
+                    <i class="fa-solid fa-file-lines text-indigo-400"></i>
+                    <span>Chi Tiết Nội Dung Ghi Nhận Xử Lý</span>
+                </h3>
+                <button onclick="closeModal()" class="text-slate-400 hover:text-white p-1 rounded-lg">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div class="space-y-3 text-xs text-slate-300">
+                <div class="grid grid-cols-2 gap-2 bg-slate-900/60 p-3 rounded-xl border border-slate-700/50">
+                    <div><span class="font-semibold text-slate-400">Số HĐ:</span> <span id="modalContract" class="font-mono text-indigo-400"></span></div>
+                    <div><span class="font-semibold text-slate-400">Khách hàng:</span> <span id="modalCustomer"></span></div>
+                    <div><span class="font-semibold text-slate-400">Ngày hủy:</span> <span id="modalDate"></span></div>
+                    <div><span class="font-semibold text-slate-400">Nhân sự KTV:</span> <span id="modalKtv" class="font-semibold text-indigo-400"></span></div>
+                </div>
+                <div>
+                    <p class="font-semibold text-slate-400 mb-1">Nội dung xử lý chi tiết:</p>
+                    <div id="modalNoteText" class="bg-slate-900 p-3 rounded-xl text-slate-200 text-xs leading-relaxed max-h-56 overflow-y-auto border border-slate-700"></div>
+                </div>
+            </div>
+            <div class="flex justify-end pt-2">
+                <button onclick="closeModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-xl text-xs font-semibold transition shadow">
+                    Đóng
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="text-center py-6 text-xs text-slate-500 border-t border-slate-800 mt-12">
+        FPT Telecom Chi Nhánh Huế &copy; 2026 | Hệ Thống Quản Lý KPI & Vận Hành Kỹ Thuật (TÀI HD1)
+    </footer>
+
+    <!-- JavaScript Master Logic -->
+    <script>
+        // Default Data for Technical Performance (Hifpt)
+        let rawData = [
+            {"nhan_su": "HUETI.MINHVV4", "dieu_hanh": "TÀI HD1", "tong_tk": 25, "tk_truoc": 14, "tk_truoc_pct": 56.0, "tk_khi": 10, "tk_khi_pct": 40.0, "tk_chua": 1, "tk_chua_pct": 4.0, "tong_bt": 55, "bt_truoc": 52, "bt_truoc_pct": 94.5, "bt_khi": 2, "bt_khi_pct": 3.6, "bt_chua": 1, "bt_chua_pct": 1.8, "is_weak": false},
+            {"nhan_su": "HUETI.PHUONGTV2", "dieu_hanh": "TÀI HD1", "tong_tk": 1, "tk_truoc": 1, "tk_truoc_pct": 100.0, "tk_khi": 0, "tk_khi_pct": 0.0, "tk_chua": 0, "tk_chua_pct": 0.0, "tong_bt": 59, "bt_truoc": 55, "bt_truoc_pct": 93.2, "bt_khi": 2, "bt_khi_pct": 3.4, "bt_chua": 2, "bt_chua_pct": 3.4, "is_weak": false},
+            {"nhan_su": "HUETI.KHANHNQ9", "dieu_hanh": "TÀI HD1", "tong_tk": 16, "tk_truoc": 9, "tk_truoc_pct": 56.2, "tk_khi": 7, "tk_khi_pct": 43.8, "tk_chua": 0, "tk_chua_pct": 0.0, "tong_bt": 59, "bt_truoc": 53, "bt_truoc_pct": 89.8, "bt_khi": 4, "bt_khi_pct": 6.8, "bt_chua": 2, "bt_chua_pct": 3.4, "is_weak": false},
+            {"nhan_su": "HUETI.HUYCVT", "dieu_hanh": "TÀI HD1", "tong_tk": 7, "tk_truoc": 6, "tk_truoc_pct": 85.7, "tk_khi": 1, "tk_khi_pct": 14.3, "tk_chua": 0, "tk_chua_pct": 0.0, "tong_bt": 35, "bt_truoc": 33, "bt_truoc_pct": 94.3, "bt_khi": 1, "bt_khi_pct": 2.9, "bt_chua": 1, "bt_chua_pct": 2.9, "is_weak": false},
+            {"nhan_su": "HUETI.KHANHNP", "dieu_hanh": "TÀI HD1", "tong_tk": 17, "tk_truoc": 7, "tk_truoc_pct": 41.2, "tk_khi": 10, "tk_khi_pct": 58.8, "tk_chua": 0, "tk_chua_pct": 0.0, "tong_bt": 53, "bt_truoc": 48, "bt_truoc_pct": 90.6, "bt_khi": 1, "bt_khi_pct": 1.9, "bt_chua": 4, "bt_chua_pct": 7.5, "is_weak": true},
+            {"nhan_su": "HUETI.HIEUPV6", "dieu_hanh": "TÀI HD1", "tong_tk": 10, "tk_truoc": 6, "tk_truoc_pct": 60.0, "tk_khi": 4, "tk_khi_pct": 40.0, "tk_chua": 0, "tk_chua_pct": 0.0, "tong_bt": 43, "bt_truoc": 42, "bt_truoc_pct": 97.7, "bt_khi": 0, "bt_khi_pct": 0.0, "bt_chua": 1, "bt_chua_pct": 2.3, "is_weak": false},
+            {"nhan_su": "HUETI.TUANPM11", "dieu_hanh": "TÀI HD1", "tong_tk": 17, "tk_truoc": 11, "tk_truoc_pct": 64.7, "tk_khi": 6, "tk_khi_pct": 35.3, "tk_chua": 0, "tk_chua_pct": 0.0, "tong_bt": 65, "bt_truoc": 63, "bt_truoc_pct": 96.9, "bt_khi": 0, "bt_khi_pct": 0.0, "bt_chua": 2, "bt_chua_pct": 3.1, "is_weak": false},
+            {"nhan_su": "HUETI.THANNV2", "dieu_hanh": "TÀI HD1", "tong_tk": 5, "tk_truoc": 2, "tk_truoc_pct": 40.0, "tk_khi": 3, "tk_khi_pct": 60.0, "tk_chua": 0, "tk_chua_pct": 0.0, "tong_bt": 27, "bt_truoc": 25, "bt_truoc_pct": 92.6, "bt_khi": 0, "bt_khi_pct": 0.0, "bt_chua": 2, "bt_chua_pct": 7.4, "is_weak": true},
+            {"nhan_su": "HUETI.THAONV1", "dieu_hanh": "TÀI HD1", "tong_tk": 19, "tk_truoc": 10, "tk_truoc_pct": 52.6, "tk_khi": 9, "tk_khi_pct": 47.4, "tk_chua": 0, "tk_chua_pct": 0.0, "tong_bt": 51, "bt_truoc": 48, "bt_truoc_pct": 94.1, "bt_khi": 0, "bt_khi_pct": 0.0, "bt_chua": 3, "bt_chua_pct": 5.9, "is_weak": true},
+            {"nhan_su": "HUETI.NHANTT1", "dieu_hanh": "TÀI HD1", "tong_tk": 18, "tk_truoc": 7, "tk_truoc_pct": 38.9, "tk_khi": 9, "tk_khi_pct": 50.0, "tk_chua": 2, "tk_chua_pct": 11.1, "tong_bt": 58, "bt_truoc": 54, "bt_truoc_pct": 93.1, "bt_khi": 0, "bt_khi_pct": 0.0, "bt_chua": 4, "bt_chua_pct": 6.9, "is_weak": true},
+            {"nhan_su": "HUETI.VINHTL", "dieu_hanh": "TÀI HD1", "tong_tk": 19, "tk_truoc": 5, "tk_truoc_pct": 26.3, "tk_khi": 4, "tk_khi_pct": 21.1, "tk_chua": 10, "tk_chua_pct": 52.6, "tong_bt": 112, "bt_truoc": 104, "bt_truoc_pct": 92.9, "bt_khi": 0, "bt_khi_pct": 0.0, "bt_chua": 8, "bt_chua_pct": 7.1, "is_weak": true},
+            {"nhan_su": "HUETI.NGHIATH2", "dieu_hanh": "TÀI HD1", "tong_tk": 17, "tk_truoc": 10, "tk_truoc_pct": 58.8, "tk_khi": 7, "tk_khi_pct": 41.2, "tk_chua": 0, "tk_chua_pct": 0.0, "tong_bt": 41, "bt_truoc": 40, "bt_truoc_pct": 97.6, "bt_khi": 0, "bt_khi_pct": 0.0, "bt_chua": 1, "bt_chua_pct": 2.4, "is_weak": false},
+            {"nhan_su": "HUETI.NHUANTD", "dieu_hanh": "TÀI HD1", "tong_tk": 29, "tk_truoc": 19, "tk_truoc_pct": 65.5, "tk_khi": 10, "tk_khi_pct": 34.5, "tk_chua": 0, "tk_chua_pct": 0.0, "tong_bt": 64, "bt_truoc": 60, "bt_truoc_pct": 93.8, "bt_khi": 1, "bt_khi_pct": 1.6, "bt_chua": 3, "bt_chua_pct": 4.7, "is_weak": false},
+            {"nhan_su": "HUETI.MINHCQ1", "dieu_hanh": "TÀI HD1", "tong_tk": 21, "tk_truoc": 11, "tk_truoc_pct": 52.4, "tk_khi": 6, "tk_khi_pct": 28.6, "tk_chua": 4, "tk_chua_pct": 19.0, "tong_bt": 55, "bt_truoc": 54, "bt_truoc_pct": 98.2, "bt_khi": 0, "bt_khi_pct": 0.0, "bt_chua": 1, "bt_chua_pct": 1.8, "is_weak": true},
+            {"nhan_su": "HUETI.MINHTV2", "dieu_hanh": "TÀI HD1", "tong_tk": 33, "tk_truoc": 13, "tk_truoc_pct": 39.4, "tk_khi": 10, "tk_khi_pct": 30.3, "tk_chua": 10, "tk_chua_pct": 30.3, "tong_bt": 79, "bt_truoc": 72, "bt_truoc_pct": 91.1, "bt_khi": 0, "bt_khi_pct": 0.0, "bt_chua": 7, "bt_chua_pct": 8.9, "is_weak": true},
+            {"nhan_su": "HUETI.HUUTM", "dieu_hanh": "TÀI HD1", "tong_tk": 25, "tk_truoc": 16, "tk_truoc_pct": 64.0, "tk_khi": 9, "tk_khi_pct": 36.0, "tk_chua": 0, "tk_chua_pct": 0.0, "tong_bt": 45, "bt_truoc": 42, "bt_truoc_pct": 93.3, "bt_khi": 1, "bt_khi_pct": 2.2, "bt_chua": 2, "bt_chua_pct": 4.4, "is_weak": false},
+            {"nhan_su": "HUETI.ANTV1", "dieu_hanh": "TÀI HD1", "tong_tk": 32, "tk_truoc": 17, "tk_truoc_pct": 53.1, "tk_khi": 14, "tk_khi_pct": 43.8, "tk_chua": 1, "tk_chua_pct": 3.1, "tong_bt": 91, "bt_truoc": 84, "bt_truoc_pct": 92.3, "bt_khi": 3, "bt_khi_pct": 3.3, "bt_chua": 4, "bt_chua_pct": 4.4, "is_weak": false},
+            {"nhan_su": "HUETI.DUCNDM", "dieu_hanh": "TÀI HD1", "tong_tk": 27, "tk_truoc": 16, "tk_truoc_pct": 59.3, "tk_khi": 10, "tk_khi_pct": 37.0, "tk_chua": 1, "tk_chua_pct": 3.7, "tong_bt": 58, "bt_truoc": 57, "bt_truoc_pct": 98.3, "bt_khi": 0, "bt_khi_pct": 0.0, "bt_chua": 1, "bt_chua_pct": 1.7, "is_weak": false},
+            {"nhan_su": "HUETI.YENHH2", "dieu_hanh": "TÀI HD1", "tong_tk": 2, "tk_truoc": 2, "tk_truoc_pct": 100.0, "tk_khi": 0, "tk_khi_pct": 0.0, "tk_chua": 0, "tk_chua_pct": 0.0, "tong_bt": 26, "bt_truoc": 25, "bt_truoc_pct": 96.2, "bt_khi": 0, "bt_khi_pct": 0.0, "bt_chua": 1, "bt_chua_pct": 3.8, "is_weak": false},
+            {"nhan_su": "HUETI.THUYLT1", "dieu_hanh": "TÀI HD1", "tong_tk": 13, "tk_truoc": 10, "tk_truoc_pct": 76.9, "tk_khi": 3, "tk_khi_pct": 23.1, "tk_chua": 0, "tk_chua_pct": 0.0, "tong_bt": 70, "bt_truoc": 68, "bt_truoc_pct": 97.1, "bt_khi": 2, "bt_khi_pct": 2.9, "bt_chua": 0, "bt_chua_pct": 0.0, "is_weak": false},
+            {"nhan_su": "HUETI.THANHNC18", "dieu_hanh": "TÀI HD1", "tong_tk": 4, "tk_truoc": 3, "tk_truoc_pct": 75.0, "tk_khi": 1, "tk_khi_pct": 25.0, "tk_chua": 0, "tk_chua_pct": 0.0, "tong_bt": 31, "bt_truoc": 30, "bt_truoc_pct": 96.8, "bt_khi": 1, "bt_khi_pct": 3.2, "bt_chua": 0, "bt_chua_pct": 0.0, "is_weak": false},
+            {"nhan_su": "HUETI.LANHND", "dieu_hanh": "TÀI HD1", "tong_tk": 16, "tk_truoc": 12, "tk_truoc_pct": 75.0, "tk_khi": 3, "tk_khi_pct": 18.8, "tk_chua": 1, "tk_chua_pct": 6.2, "tong_bt": 27, "bt_truoc": 27, "bt_truoc_pct": 100.0, "bt_khi": 0, "bt_khi_pct": 0.0, "bt_chua": 0, "bt_chua_pct": 0.0, "is_weak": false},
+            {"nhan_su": "HUETI.THUANND9", "dieu_hanh": "TÀI HD1", "tong_tk": 16, "tk_truoc": 9, "tk_truoc_pct": 56.2, "tk_khi": 7, "tk_khi_pct": 43.8, "tk_chua": 0, "tk_chua_pct": 0.0, "tong_bt": 79, "bt_truoc": 79, "bt_truoc_pct": 100.0, "bt_khi": 0, "bt_khi_pct": 0.0, "bt_chua": 0, "bt_chua_pct": 0.0, "is_weak": false},
+            {"nhan_su": "HUETI.PHONGCN", "dieu_hanh": "TÀI HD1", "tong_tk": 0, "tk_truoc": 0, "tk_truoc_pct": 0.0, "tk_khi": 0, "tk_khi_pct": 0.0, "tk_chua": 0, "tk_chua_pct": 0.0, "tong_bt": 9, "bt_truoc": 9, "bt_truoc_pct": 100.0, "bt_khi": 0, "bt_khi_pct": 0.0, "bt_chua": 0, "bt_chua_pct": 0.0, "is_weak": false}
+        ];
+
+        // Default Data for Cancellations
+        let cancelData = [
+            {"date": "15/08/2026", "month": "09/2026", "contract": "HUAAG7902", "customer": "Lê Đức Phước", "service": "Combo", "reason": "Thời gian SD ít", "price": 195000.0, "ktv": "HUETI.LANHND", "note": "0932564246 KH thầu xây dựng đky mạng để xem cam, hiện tại công trình xong kh bỏ đi, tháo điện..."},
+            {"date": "18/08/2026", "month": "09/2026", "contract": "HUAAG8136", "customer": "Vo Van Ngoc", "service": "Combo", "reason": "Đi vắng dài ngày", "price": 210000.0, "ktv": "HUETI.KHANHNP", "note": "0372875425 KH báo đi làm xa nhà yc huỷ mạng..."},
+            {"date": "24/08/2026", "month": "09/2026", "contract": "HUAAC1919", "customer": "HOANG THI THUY", "service": "Net", "reason": "Cước phí dịch vụ", "price": 185000.0, "ktv": "HUETI.NHANTT1", "note": "0869808375 khách chuyển VNPT vì có người giới thiệu chuyển..."},
+            {"date": "24/08/2026", "month": "09/2026", "contract": "HUAAB8047", "customer": "NGUYEN XUAN QUOC DUNG", "service": "Combo", "reason": "Chất lượng đường truyền", "price": 213601.0, "ktv": "HUETI.TUANPM11", "note": "0374228385 KH baó mạng sd chậm, tivi sd hay bị đơ..."},
+            {"date": "24/08/2026", "month": "09/2026", "contract": "HUAAG0225", "customer": "NGUYEN DANG TRUNG", "service": "Combo", "reason": "Chất lượng đường truyền", "price": 210100.0, "ktv": "HUETI.NGHIATH2", "note": "0985538240 khách hàng báo mạng sd chậm..."}
+        ];
+
+        let currentCancelData = [...cancelData];
+        let chartTopVol = null;
+        let chartUnact = null;
+        let employeeChartInstance = null;
+        let reasonChartInstance = null;
+
+        // Tab Switching
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(el => {
+                el.classList.remove('bg-orange-600', 'text-white', 'shadow-md');
+                el.classList.add('bg-slate-800', 'text-slate-300');
+            });
+            
+            document.getElementById('tab-' + tabId).classList.remove('hidden');
+            const activeBtn = document.getElementById('tab-btn-' + tabId);
+            activeBtn.classList.remove('bg-slate-800', 'text-slate-300');
+            activeBtn.classList.add('bg-orange-600', 'text-white', 'shadow-md');
+        }
+
+        // Initialize Dashboard
+        function initDashboard() {
+            renderKPIs();
+            renderTables(rawData);
+            renderWeakStaff();
+            initCharts();
+            updateCancelDashboard(currentCancelData);
+        }
+
+        function renderKPIs() {
+            let totalStaff = rawData.length;
+            let sumTK = rawData.reduce((acc, cur) => acc + cur.tong_tk, 0);
+            let sumBT = rawData.reduce((acc, cur) => acc + cur.tong_bt, 0);
+            let weakList = rawData.filter(x => x.is_weak);
+
+            document.getElementById('statTotalStaff').innerText = totalStaff;
+            document.getElementById('statTotalTK').innerText = sumTK;
+            document.getElementById('statTotalBT').innerText = sumBT.toLocaleString();
+            
+            let statTotalWeakEl = document.getElementById('statTotalWeak');
+            if (statTotalWeakEl) {
+                statTotalWeakEl.innerText = weakList.length;
+            }
+            document.getElementById('weak-badge').innerText = weakList.length;
+        }
+
+        function renderTables(dataToRender) {
+            const tbodyDep = document.getElementById('tbodyDeployment');
+            const tbodyMaint = document.getElementById('tbodyMaintenance');
+            
+            tbodyDep.innerHTML = '';
+            tbodyMaint.innerHTML = '';
+
+            dataToRender.forEach(item => {
+                let depBadge = item.tk_chua_pct > 10 ? 
+                    `<span class="px-2 py-0.5 bg-red-500/20 text-red-400 border border-red-500/30 rounded text-[10px] font-bold">Yếu (${item.tk_chua_pct}%)</span>` :
+                    `<span class="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded text-[10px]">Đạt</span>`;
+
+                tbodyDep.innerHTML += `
+                    <tr class="hover:bg-slate-700/30 transition">
+                        <td class="p-3 font-medium text-white flex items-center space-x-2">
+                            <i class="fa-solid fa-user-circle text-slate-400"></i>
+                            <span>${item.nhan_su}</span>
+                        </td>
+                        <td class="p-3 text-center font-bold text-orange-400">${item.tong_tk}</td>
+                        <td class="p-3 text-center">${item.tk_truoc}</td>
+                        <td class="p-3 text-center text-slate-300">${item.tk_truoc_pct}%</td>
+                        <td class="p-3 text-center">${item.tk_khi}</td>
+                        <td class="p-3 text-center text-slate-300">${item.tk_khi_pct}%</td>
+                        <td class="p-3 text-center font-bold ${item.tk_chua > 2 ? 'text-red-400' : 'text-slate-300'}">${item.tk_chua}</td>
+                        <td class="p-3 text-center font-semibold ${item.tk_chua_pct > 10 ? 'text-red-400' : 'text-slate-300'}">${item.tk_chua_pct}%</td>
+                        <td class="p-3 text-center">${depBadge}</td>
+                    </tr>
+                `;
+
+                let maintBadge = item.bt_chua_pct > 5 ? 
+                    `<span class="px-2 py-0.5 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded text-[10px] font-bold">Cần lưu ý</span>` :
+                    `<span class="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded text-[10px]">Tốt</span>`;
+
+                tbodyMaint.innerHTML += `
+                    <tr class="hover:bg-slate-700/30 transition">
+                        <td class="p-3 font-medium text-white flex items-center space-x-2">
+                            <i class="fa-solid fa-user-circle text-slate-400"></i>
+                            <span>${item.nhan_su}</span>
+                        </td>
+                        <td class="p-3 text-center font-bold text-cyan-400">${item.tong_bt}</td>
+                        <td class="p-3 text-center">${item.bt_truoc}</td>
+                        <td class="p-3 text-center text-slate-300">${item.bt_truoc_pct}%</td>
+                        <td class="p-3 text-center">${item.bt_khi}</td>
+                        <td class="p-3 text-center text-slate-300">${item.bt_khi_pct}%</td>
+                        <td class="p-3 text-center font-bold ${item.bt_chua > 3 ? 'text-red-400' : 'text-slate-300'}">${item.bt_chua}</td>
+                        <td class="p-3 text-center font-semibold ${item.bt_chua_pct > 5 ? 'text-amber-400' : 'text-slate-300'}">${item.bt_chua_pct}%</td>
+                        <td class="p-3 text-center">${maintBadge}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        function renderWeakStaff() {
+            const weakContainer = document.getElementById('weakStaffContainer');
+            weakContainer.innerHTML = '';
+            let weakCount = 0;
+
+            rawData.forEach(item => {
+                if (item.is_weak) {
+                    weakCount++;
+                    weakContainer.innerHTML += `
+                        <div class="bg-slate-900/80 border border-red-500/30 rounded-xl p-5 shadow-lg flex flex-col justify-between space-y-4">
+                            <div>
+                                <div class="flex justify-between items-start">
+                                    <h4 class="font-bold text-white text-base flex items-center space-x-2">
+                                        <i class="fa-solid fa-user-shield text-red-500"></i>
+                                        <span>${item.nhan_su}</span>
+                                    </h4>
+                                    <span class="px-2 py-0.5 bg-red-600 text-white rounded text-[10px] font-bold">Yếu Kém</span>
+                                </div>
+                                <div class="mt-3 space-y-1.5 text-xs text-slate-300">
+                                    <div class="flex justify-between">
+                                        <span class="text-slate-400">Triển Khai (TK):</span>
+                                        <span class="font-bold text-orange-400">${item.tong_tk} ca (Chưa kích hoạt: ${item.tk_chua} ca - ${item.tk_chua_pct}%)</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-slate-400">Bảo Trì (BT):</span>
+                                        <span class="font-bold text-cyan-400">${item.tong_bt} ca (Chưa kích hoạt: ${item.bt_chua} ca - ${item.bt_chua_pct}%)</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="pt-3 border-t border-slate-700 flex justify-between items-center text-xs">
+                                <span class="text-red-400 font-medium"><i class="fa-solid fa-triangle-exclamation"></i> Cần đào tạo lại</span>
+                                <button onclick="alert('Đã tạo phiếu đề xuất kế hoạch cải thiện cho nhân sự: ${item.nhan_su}')" class="bg-orange-600 hover:bg-orange-500 text-white px-3 py-1.5 rounded-lg font-semibold transition">
+                                    Lập Kế Hoạch
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+            document.getElementById('weak-badge').innerText = weakCount;
+        }
+
+        function sortTable(type) {
+            let select = document.getElementById(type === 'deployment' ? 'sortDeployment' : 'sortMaintenance');
+            let val = select.value;
+            let sorted = [...rawData];
+
+            if (val === 'name_asc') sorted.sort((a, b) => a.nhan_su.localeCompare(b.nhan_su));
+            else if (val === 'name_desc') sorted.sort((a, b) => b.nhan_su.localeCompare(a.nhan_su));
+            else if (val === 'total_desc') sorted.sort((a, b) => type === 'deployment' ? b.tong_tk - a.tong_tk : b.tong_bt - a.tong_bt);
+            else if (val === 'unact_desc') sorted.sort((a, b) => type === 'deployment' ? b.tk_chua_pct - a.tk_chua_pct : b.bt_chua_pct - a.bt_chua_pct);
+
+            renderTables(sorted);
+        }
+
+        function initCharts() {
+            const sortedByTotal = [...rawData].sort((a, b) => (b.tong_tk + b.tong_bt) - (a.tong_tk + a.tong_bt)).slice(0, 10);
+            const labels = sortedByTotal.map(x => x.nhan_su.replace('HUETI.', ''));
+            const tkData = sortedByTotal.map(x => x.tong_tk);
+            const btData = sortedByTotal.map(x => x.tong_bt);
+
+            const ctx1 = document.getElementById('topVolumeChart').getContext('2d');
+            if (chartTopVol) chartTopVol.destroy();
+            chartTopVol = new Chart(ctx1, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Triển Khai (TK)', data: tkData, backgroundColor: '#f15a24', borderRadius: 4 },
+                        { label: 'Bảo Trì (BT)', data: btData, backgroundColor: '#0284c7', borderRadius: 4 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#cbd5e1', font: { size: 11 } } } },
+                    scales: {
+                        x: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: '#334155' } },
+                        y: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: '#334155' } }
+                    }
+                }
+            });
+
+            const topUnactivated = [...rawData].sort((a, b) => b.tk_chua_pct - a.tk_chua_pct).slice(0, 6);
+            const labelsUnact = topUnactivated.map(x => x.nhan_su.replace('HUETI.', ''));
+            const unactTkPct = topUnactivated.map(x => x.tk_chua_pct);
+            const unactBtPct = topUnactivated.map(x => x.bt_chua_pct);
+
+            const ctx2 = document.getElementById('unactivatedRatioChart').getContext('2d');
+            if (chartUnact) chartUnact.destroy();
+            chartUnact = new Chart(ctx2, {
+                type: 'bar',
+                data: {
+                    labels: labelsUnact,
+                    datasets: [
+                        { label: '% Chưa Kích Hoạt TK', data: unactTkPct, backgroundColor: '#ef4444', borderRadius: 4 },
+                        { label: '% Chưa Kích Hoạt BT', data: unactBtPct, backgroundColor: '#f59e0b', borderRadius: 4 }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#cbd5e1', font: { size: 11 } } } },
+                    scales: {
+                        x: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: '#334155' } },
+                        y: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: '#334155' } }
+                    }
+                }
+            });
+        }
+
+        // Handle Technical File Upload
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    let sheetName = workbook.SheetNames.includes('Tổng Báo Cáo') ? 'Tổng Báo Cáo' : workbook.SheetNames[0];
+                    const jsonRows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+                    if (jsonRows.length === 0) return alert('File không có dữ liệu!');
+
+                    let parsedData = [];
+                    jsonRows.forEach(row => {
+                        let nhanSu = row['Nhân Sự'] || row['Nhân sự'] || Object.values(row)[1] || 'N/A';
+                        let dieuHanh = row['Điều Hành'] || Object.values(row)[0] || 'TÀI HD1';
+                        let tongTK = parseFloat(row['Tổng TK'] || 0);
+                        let truocTK = parseFloat(row['Kích Trước TK'] || 0);
+                        let khiTK = parseFloat(row['Kích Khi TK'] || 0);
+                        let chuaTK = parseFloat(row['Chưa Kích TK'] || 0);
+                        let pctChuaTK = tongTK > 0 ? (chuaTK / tongTK) * 100 : 0;
+
+                        let tongBT = parseFloat(row['Tổng BT'] || 0);
+                        let truocBT = parseFloat(row['Kích Trước BT'] || 0);
+                        let khiBT = parseFloat(row['Kích Khi Bảo Trì'] || row['Kích Khi BT'] || 0);
+                        let chuaBT = parseFloat(row['Chưa Kích BT'] || 0);
+                        let pctChuaBT = tongBT > 0 ? (chuaBT / tongBT) * 100 : 0;
+
+                        let isWeak = (pctChuaTK > 10.0) || (pctChuaBT > 5.0) || (chuaTK + chuaBT >= 8);
+
+                        parsedData.push({
+                            nhan_su: String(nhanSu), dieu_hanh: String(dieuHanh),
+                            tong_tk: parseInt(tongTK), tk_truoc: parseInt(truocTK), tk_truoc_pct: Math.round((truocTK/tongTK)*100*10)/10 || 0,
+                            tk_khi: parseInt(khiTK), tk_khi_pct: Math.round((khiTK/tongTK)*100*10)/10 || 0,
+                            tk_chua: parseInt(chuaTK), tk_chua_pct: Math.round(pctChuaTK*10)/10,
+                            tong_bt: parseInt(tongBT), bt_truoc: parseInt(truocBT), bt_truoc_pct: Math.round((truocBT/tongBT)*100*10)/10 || 0,
+                            bt_khi: parseInt(khiBT), bt_khi_pct: Math.round((khiBT/tongBT)*100*10)/10 || 0,
+                            bt_chua: parseInt(chuaBT), bt_chua_pct: Math.round(pctChuaBT*10)/10,
+                            is_weak: Boolean(isWeak)
+                        });
+                    });
+                    rawData = parsedData;
+                    initDashboard();
+                    alert('Nạp dữ liệu kỹ thuật thành công!');
+                } catch(err) { alert('Lỗi: ' + err.message); }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Handle Cancellation File Upload
+        function handleCancelFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const jsonRows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
+                if (jsonRows.length < 2) return;
+
+                const headers = jsonRows[0];
+                let idxDate = headers.findIndex(h => h && h.toString().includes('Ngày'));
+                let idxContract = headers.findIndex(h => h && h.toString().includes('Số hợp đồng'));
+                let idxCustomer = headers.findIndex(h => h && h.toString().includes('Tên Khách Hàng'));
+                let idxService = headers.findIndex(h => h && h.toString().includes('Dịch vụ'));
+                let idxReason = headers.findIndex(h => h && h.toString().includes('Nguyên nhân RM'));
+                let idxPrice = headers.findIndex(h => h && h.toString().includes('Giá cước'));
+                let idxNote = headers.findIndex(h => h && h.toString().includes('Nội dung xử lý'));
+                let idxKtv = headers.findIndex(h => h && h.toString().includes('Nhân Sự KTV'));
+
+                const newParsedData = [];
+                for (let i = 1; i < jsonRows.length; i++) {
+                    const r = jsonRows[i];
+                    if (r && r.length > 0) {
+                        newParsedData.push({
+                            date: idxDate >= 0 ? String(r[idxDate] || '') : '',
+                            contract: idxContract >= 0 ? String(r[idxContract] || '') : '',
+                            customer: idxCustomer >= 0 ? String(r[idxCustomer] || '') : '',
+                            service: idxService >= 0 ? String(r[idxService] || '') : '',
+                            reason: idxReason >= 0 ? String(r[idxReason] || 'Khác') : 'Khác',
+                            price: idxPrice >= 0 ? parseFloat(r[idxPrice]) || 0 : 0,
+                            ktv: idxKtv >= 0 ? String(r[idxKtv] || 'Chưa rõ') : 'Chưa rõ',
+                            note: idxNote >= 0 ? String(r[idxNote] || '') : ''
+                        });
+                    }
+                }
+                if (newParsedData.length > 0) {
+                    cancelData = newParsedData;
+                    currentCancelData = [...cancelData];
+                    updateCancelDashboard(currentCancelData);
+                    alert('Nạp dữ liệu ca hủy thành công (' + currentCancelData.length + ' ca)!');
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Update Cancellation Dashboard & Overview KPI
+        function updateCancelDashboard(data) {
+            updateCancelKPIs(data);
+            populateReasonDropdown(data);
+            renderCancelCharts(data);
+            renderEmployeeSummaryTable(data);
+            renderReasonSummaryTable(data);
+            renderDetailsTable(data);
+        }
+
+        function updateCancelKPIs(data) {
+            const totalCancellations = data.length;
+            const totalValue = data.reduce((sum, item) => sum + item.price, 0);
+
+            const ktvCounts = {};
+            const reasonCounts = {};
+            data.forEach(item => {
+                ktvCounts[item.ktv || 'Chưa rõ'] = (ktvCounts[item.ktv || 'Chưa rõ'] || 0) + 1;
+                reasonCounts[item.reason || 'Khác'] = (reasonCounts[item.reason || 'Khác'] || 0) + 1;
+            });
+
+            let topKtv = '--', maxKtvCount = 0;
+            for (const [k, c] of Object.entries(ktvCounts)) { if (c > maxKtvCount) { maxKtvCount = c; topKtv = k; } }
+
+            let topReason = '--', maxReasonCount = 0;
+            for (const [r, c] of Object.entries(reasonCounts)) { if (c > maxReasonCount) { maxReasonCount = c; topReason = r; } }
+
+            document.getElementById('kpiTotalCancellations').innerText = totalCancellations;
+            document.getElementById('statTotalCancel').innerText = totalCancellations;
+            
+            const formattedVal = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(totalValue);
+            document.getElementById('kpiTotalValue').innerText = formattedVal;
+            document.getElementById('statTotalCancelValue').innerText = formattedVal;
+
+            document.getElementById('kpiTopEmployee').innerText = topKtv;
+            document.getElementById('kpiTopEmployeeCount').innerText = `${maxKtvCount} ca hủy`;
+            document.getElementById('kpiTopReason').innerText = topReason;
+        }
+
+        function populateReasonDropdown(data) {
+            const select = document.getElementById('filterReason');
+            const currentVal = select.value;
+            const reasons = [...new Set(data.map(item => item.reason))].filter(Boolean).sort();
+            select.innerHTML = '<option value="">Tất cả Nguyên nhân</option>';
+            reasons.forEach(r => {
+                const opt = document.createElement('option');
+                opt.value = r; opt.innerText = r;
+                if (r === currentVal) opt.selected = true;
+                select.appendChild(opt);
+            });
+        }
+
+        function renderCancelCharts(data) {
+            const ktvCounts = {};
+            data.forEach(item => { ktvCounts[item.ktv || 'Chưa rõ'] = (ktvCounts[item.ktv || 'Chưa rõ'] || 0) + 1; });
+            const sortedKtv = Object.entries(ktvCounts).sort((a,b) => b[1] - a[1]);
+
+            if (employeeChartInstance) employeeChartInstance.destroy();
+            employeeChartInstance = new Chart(document.getElementById('employeeChart').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: sortedKtv.map(x => x[0]),
+                    datasets: [{ label: 'Số ca hủy', data: sortedKtv.map(x => x[1]), backgroundColor: '#6366f1', borderRadius: 6 }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8' } },
+                        x: { grid: { display: false }, ticks: { color: '#94a3b8', font: { size: 10 }, maxRotation: 45 } }
+                    }
+                }
+            });
+
+            const reasonCounts = {};
+            data.forEach(item => { reasonCounts[item.reason || 'Khác'] = (reasonCounts[item.reason || 'Khác'] || 0) + 1; });
+
+            if (reasonChartInstance) reasonChartInstance.destroy();
+            reasonChartInstance = new Chart(document.getElementById('reasonChart').getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(reasonCounts),
+                    datasets: [{ data: Object.values(reasonCounts), backgroundColor: ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#8b5cf6', '#3b82f6', '#14b8a6', '#f43f5e'] }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, color: '#cbd5e1', font: { size: 10 } } } },
+                    cutout: '65%'
+                }
+            });
+        }
+
+        function renderEmployeeSummaryTable(data) {
+            const tbody = document.getElementById('employeeTableBody');
+            tbody.innerHTML = '';
+            let stats = {}, total = data.length;
+            data.forEach(item => {
+                if (!stats[item.ktv]) stats[item.ktv] = { count: 0, val: 0 };
+                stats[item.ktv].count++; stats[item.ktv].val += (item.price || 0);
+            });
+            Object.entries(stats).sort((a,b)=>b[1].count - a[1].count).forEach(([ktv, st]) => {
+                let pct = total > 0 ? ((st.count/total)*100).toFixed(1) : 0;
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-700/30 transition">
+                        <td class="p-3 font-medium text-white">${ktv}</td>
+                        <td class="p-3 text-center"><span class="px-2 py-0.5 bg-slate-900 rounded text-indigo-400 font-bold">${st.count}</span></td>
+                        <td class="p-3 text-right text-slate-300">${new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(st.val)}</td>
+                        <td class="p-3 text-right font-semibold text-slate-300">${pct}%</td>
+                    </tr>
+                `;
+            });
+        }
+
+        function renderReasonSummaryTable(data) {
+            const tbody = document.getElementById('reasonTableBody');
+            if(!tbody) return;
+            tbody.innerHTML = '';
+            let stats = {}, total = data.length;
+            data.forEach(item => {
+                let r = item.reason || 'Khác';
+                if (!stats[r]) stats[r] = { count: 0, val: 0 };
+                stats[r].count++; stats[r].val += (item.price || 0);
+            });
+            Object.entries(stats).sort((a,b)=>b[1].count - a[1].count).forEach(([r, st]) => {
+                let pct = total > 0 ? ((st.count/total)*100).toFixed(1) : 0;
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-700/30 transition">
+                        <td class="p-3 font-medium text-white">${r}</td>
+                        <td class="p-3 text-center"><span class="px-2 py-0.5 bg-slate-900 rounded text-purple-400 font-bold">${st.count}</span></td>
+                        <td class="p-3 text-right text-slate-300">${new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(st.val)}</td>
+                        <td class="p-3 text-right font-semibold text-slate-300">${pct}%</td>
+                    </tr>
+                `;
+            });
+        }
+
+        function renderDetailsTable(data) {
+            const tbody = document.getElementById('detailsTableBody');
+            tbody.innerHTML = '';
+            data.forEach(item => {
+                let origIdx = cancelData.indexOf(item);
+                let priceFormatted = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(item.price || 0);
+                tbody.innerHTML += `
+                    <tr class="hover:bg-slate-700/30 transition">
+                        <td class="p-3 text-slate-400">${item.date || ''}</td>
+                        <td class="p-3 font-mono text-indigo-400 font-semibold">${item.contract || ''}</td>
+                        <td class="p-3 font-medium text-white">${item.customer || ''}</td>
+                        <td class="p-3 text-slate-300"><span class="bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-0.5 rounded text-[10px]">${item.reason}</span></td>
+                        <td class="p-3 text-right font-semibold text-white">${priceFormatted}</td>
+                        <td class="p-3 font-medium text-indigo-300">${item.ktv || ''}</td>
+                        <td class="p-3 text-center">
+                            <button onclick="openNoteModal(${origIdx})" class="bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 px-2.5 py-1 rounded text-[10px] font-semibold transition">
+                                Xem
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        function triggerCancelUpdate() {
+            let keyword = document.getElementById('searchInput').value.toLowerCase();
+            let reason = document.getElementById('filterReason').value;
+            let sort = document.getElementById('sortKtv').value;
+
+            let filtered = cancelData.filter(item => {
+                let matchKey = (item.ktv && item.ktv.toLowerCase().includes(keyword)) ||
+                               (item.customer && item.customer.toLowerCase().includes(keyword)) ||
+                               (item.contract && item.contract.toLowerCase().includes(keyword)) ||
+                               (item.note && item.note.toLowerCase().includes(keyword));
+                let matchRes = reason === "" || item.reason === reason;
+                return matchKey && matchRes;
+            });
+
+            if (sort === 'asc') filtered.sort((a,b)=>(a.ktv||"").localeCompare(b.ktv||""));
+            else if (sort === 'desc') filtered.sort((a,b)=>(b.ktv||"").localeCompare(a.ktv||""));
+
+            currentCancelData = filtered;
+            updateCancelKPIs(filtered);
+            renderCancelCharts(filtered);
+            renderEmployeeSummaryTable(filtered);
+            renderReasonSummaryTable(filtered);
+            renderDetailsTable(filtered);
+
+            let notice = document.getElementById('noDataNotice');
+            if(filtered.length === 0) notice.classList.remove('hidden');
+            else notice.classList.add('hidden');
+        }
+
+        function openNoteModal(index) {
+            let item = cancelData[index];
+            if(!item) return;
+            document.getElementById('modalContract').innerText = item.contract || '';
+            document.getElementById('modalCustomer').innerText = item.customer || '';
+            document.getElementById('modalDate').innerText = item.date || '';
+            document.getElementById('modalKtv').innerText = item.ktv || '';
+            document.getElementById('modalNoteText').innerText = item.note || 'Không có ghi chú.';
+            document.getElementById('noteModal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('noteModal').classList.add('hidden');
+        }
+
+        window.onload = initDashboard;
+    </script>
+</body>
+</html>
